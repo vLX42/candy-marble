@@ -95,7 +95,11 @@ func _on_slingshot(ball: Ball) -> void:
 # --- cannon ---------------------------------------------------------------------
 
 func _build_cannon() -> void:
-	_area(Vector3(1.4, 1.2, 1.4), Vector3(0, 0.6, 0), _on_cannon)
+	# Aim the barrel (model +Z) at the target.
+	var to := target - Vector2(global_position.x, global_position.z)
+	if to.length() > 0.1:
+		global_rotation.y = atan2(to.x, to.y)
+	_area(Vector3(1.6, 1.4, 1.6), Vector3(0, 0.7, 0), _on_cannon)
 	_visual = Palette.load_model(self, "cannon")
 	if _visual == null:
 		_visual = Node3D.new()
@@ -108,14 +112,14 @@ func _on_cannon(ball: Ball) -> void:
 	if _busy or not ball.alive:
 		return
 	_busy = true
-	ball.call_deferred("hold_at", global_position + Vector3.UP * 0.7)
+	ball.call_deferred("hold_at", to_global(Vector3(0, 0.95, 0.4)))
 	get_tree().call_group("game", "on_boost", global_position)
 	_squash()
 	await get_tree().create_timer(0.45).timeout
 	if not is_instance_valid(ball) or not ball.alive:
 		_busy = false
 		return
-	var start := global_position + Vector3.UP * 1.3
+	var start := to_global(Vector3(0, 1.45, 0.8))
 	var level: LevelBase = get_tree().get_first_node_in_group("game").level
 	var dest := Vector3(target.x, level.height(target.x, target.y) + 0.6, target.y)
 	var flat := Vector2(dest.x - start.x, dest.z - start.z)
@@ -254,8 +258,6 @@ func _process(delta: float) -> void:
 		while _spin_acc > TAU:
 			_spin_acc -= TAU
 			_score(15)
-	if kind == "cannon" and _visual:
-		_visual.rotation.y += delta * 0.4
 
 
 # --- redirect bank --------------------------------------------------------------

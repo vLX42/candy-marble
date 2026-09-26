@@ -137,7 +137,7 @@ func load_level(data: LevelBase) -> void:
 	add_child(world)
 	world.add_child(Terrain.new(level))
 	var backdrop := Backdrop.new()
-	backdrop.setup(Rect2(0, 0, level.cols * LevelBase.TILE, level.rows * LevelBase.TILE), hash(level.title))
+	backdrop.setup(level, hash(level.title))
 	world.add_child(backdrop)
 
 	ball = SCENES.ball.instantiate()

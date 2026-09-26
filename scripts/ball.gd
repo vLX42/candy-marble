@@ -130,10 +130,6 @@ func align_to_lane(point: Vector3, dir: Vector3, min_speed: float = 0.0) -> void
 func redirect_to(point: Vector3, dir: Vector3, speed: float) -> void:
 	if not alive:
 		return
-	var rel := global_position - point
-	var target := point + dir * rel.dot(dir)
-	target.y = global_position.y
-	global_transform = Transform3D(global_basis, target)
 	linear_velocity = dir * speed + Vector3.UP * linear_velocity.y
 	_match_roll()
 

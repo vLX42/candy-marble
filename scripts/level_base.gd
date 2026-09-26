@@ -42,7 +42,7 @@ var extras: Array[Dictionary] = []
 ## Waypoints for the test bot, in tile units (Vector2(3, 1) = centre of tile 3,1).
 var route: Array[Vector2] = []
 var tier_colors: Array[Color] = [
-	Palette.MINT, Palette.LILAC, Color("#BFE3F7"), Color("#F9C6D3"), Color("#FFE7B3"), Palette.MINT,
+	Palette.MINT, Palette.LILAC, Color("#BFE3F7"), Color("#F9C6D3"), Color("#FFE7B3"),
 ]
 
 # Filled by build().
@@ -222,7 +222,7 @@ func cell_color(i: int, j: int, x: float, z: float) -> Color:
 	if is_ramp(i, j):
 		c = Palette.LEMON
 	else:
-		c = tier_colors[clampi(tier_of(i, j), 0, tier_colors.size() - 1)]
+		c = tier_colors[posmod(tier_of(i, j), tier_colors.size())]
 	var f := feature(x, z)
 	if f < -0.35:
 		c = Palette.SKY.darkened(0.08)

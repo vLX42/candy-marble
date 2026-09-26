@@ -19,12 +19,12 @@ WASD / arrows / left stick to push the ball, R or Enter to restart the level.
 
 | # | Level | Par | What's in it |
 |---|---|---|---|
-| 1 | Sugar Lane | 38 s | Railed tour: waves, bumpers, a slow sweeper, a loop, candy river, booster jump |
-| 2 | Gumdrop Pinball | 30 s | Downhill into a railed bumper table, bridge sweepers, loop, trench putt |
-| 3 | Sprinkle Skies | 16 s | Island hopping with two kicker jumps through hoops |
-| 4 | Licorice Loops | 52 s | Terraces, bumper deck, a backwards loop, ramp down to the hole |
-| 5 | Candy Castle | 42 s | Loop start, east wall sweepers, kicker over the moat, castle top |
-| 6 | Pinball Parlor | 22 s | Speed run: drop targets, speed banks, spinner, rollovers, cannon over the void |
+| 1 | Sugar Lane | 155 s | Long friendly tour with rails: waves, hills, bumpers, loops, rivers, jumps |
+| 2 | Gumdrop Pinball | 130 s | Bumper tables, slingshots, speed-bank corners and loops |
+| 3 | Sprinkle Skies | 100 s | Island hopping: kicker jumps through hoops, cannon hops, sweeper bridges |
+| 4 | Licorice Loops | 210 s | Loops, candy rivers and drops, sweepers on every other bend |
+| 5 | Candy Castle | 165 s | The long climb: ramps up past fast sweepers, bridges, kickers and cannons |
+| 6 | Pinball Parlor | 115 s | Speed run: tables, cannons, loops, speed banks |
 
 ## Making levels
 
@@ -33,7 +33,10 @@ Levels are two ASCII maps of 2x2 tiles, see the legend at the top of
 sweepers `x---` / `z|`, checkpoints, trenches, waves, decor...). Loops, cannons,
 hoops, spinners, slingshots and speed banks go in `extras`.
 
-The shipped levels are generated from `tools/genlevels.py`:
+The shipped levels are stitched together from track pieces (straights, waves,
+bumper fields, sweeper gates, bridges, ramps, drops, kicker jumps, loops,
+rivers, pinball tables, cannon hops, corners) by `tools/course.py`; each level
+is a list of pieces in `tools/genlevels.py`:
 
 ```bash
 python3 tools/genlevels.py
