@@ -1,0 +1,5 @@
+.godot/
+*.import
+/android/
+tests/shots/
+.DS_Store
