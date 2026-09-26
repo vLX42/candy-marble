@@ -46,8 +46,6 @@ static var requested_level := -1
 @export var first_level := 0
 ## Off for tests: stay on the level after reaching the goal.
 @export var auto_advance := true
-## Off for tests: losing a race doesn't stop the level.
-@export var race_blocking := true
 ## Off for tests: don't write high scores.
 @export var save_scores := true
 
@@ -80,6 +78,8 @@ var _hud_rush: ProgressBar
 var _hud_rush_label: Label
 
 var _message_token := 0
+## Shown again when a timed message runs out (e.g. "the rival won").
+var _sticky_message := ""
 var _shake := 0.0
 
 
@@ -149,6 +149,7 @@ func load_level(data: LevelBase) -> void:
 	level = data
 	level.build()
 	finished = false
+	_sticky_message = ""
 	level_time = 0.0
 	level_falls = 0
 	rush_meter = 0.0
@@ -303,12 +304,12 @@ func _on_rival_goal() -> void:
 	rival_time = level_time
 	if finished:
 		return
+	# You can still roll home, but the level isn't cleared.
 	race_lost = true
 	sfx.play("timeup")
 	cheer("RIVAL WINS", rival.global_position + Vector3.UP * 1.5)
-	if race_blocking:
-		finished = true
-		show_message("The licorice ball won the race!\nR to try again")
+	_sticky_message = "The licorice ball got there first!\nR to race again"
+	show_message(_sticky_message)
 
 
 func _camera_target() -> Vector3:
@@ -326,14 +327,19 @@ func _on_ball_died() -> void:
 
 
 func _on_goal() -> void:
-	if finished and not (race_lost and not race_blocking):
+	if finished:
 		return
 	finished = true
+	if race_lost:
+		_sticky_message = ""
+		sfx.play("pop")
+		cheer("2ND", ball.global_position + Vector3.UP * 1.5)
+		show_message("2nd place.  The licorice ball won by %.2f s\nR to race again    Esc for menu" % (level_time - rival_time))
+		return
 	if rival and not race_lost:
 		rival.finished = true
 		cheer("YOU WIN THE RACE!", ball.global_position + Vector3.UP * 2.6)
-	if not race_lost:
-		scores.unlock(level_index + 2)
+	scores.unlock(level_index + 2)
 	sfx.play("goal")
 	burst(ball.global_position + Vector3.UP * 0.8, [Palette.LEMON, Palette.PINK, Palette.MINT, Palette.LILAC, Palette.SKY], 60, 7.0)
 	var rank := scores.submit(_score_key(), level_time)
@@ -457,7 +463,7 @@ func show_message(text: String, duration: float = 0.0) -> void:
 		return
 	await get_tree().create_timer(duration).timeout
 	if token == _message_token:
-		_hud_message.text = ""
+		_hud_message.text = _sticky_message
 
 
 # --- Setup ------------------------------------------------------------------

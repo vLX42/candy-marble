@@ -78,6 +78,7 @@ last level.
 ```bash
 godot --headless --fixed-fps 120 -s tests/playtest.gd      # mechanics
 godot --headless --fixed-fps 120 -s tests/levels_test.gd   # bot plays every level
+godot --headless --fixed-fps 120 -s tests/race_test.gd     # race win / 2nd place outcomes
 godot --always-on-top -s tests/shots.gd                   # screenshots to tests/shots/
 ```
 

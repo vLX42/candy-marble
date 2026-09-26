@@ -24,7 +24,6 @@ func _initialize() -> void:
 	main.auto_advance = false
 
 	main.save_scores = false
-	main.race_blocking = false
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--level="):
 			levels = [int(arg.get_slice("=", 1)) - 1]
