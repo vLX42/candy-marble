@@ -5,6 +5,7 @@ extends Area3D
 ## ball drops in it sinks and `reached` fires.
 
 signal reached
+signal rival_reached
 
 var _done := false
 
@@ -39,6 +40,12 @@ func _ready() -> void:
 
 
 func _on_body_entered(body: Node3D) -> void:
+	if body is Rival:
+		if not body.finished:
+			body.finished = true
+			body.call_deferred("sink")
+			rival_reached.emit()
+		return
 	if body is Ball and not _done:
 		_done = true
 		body.call_deferred("sink")

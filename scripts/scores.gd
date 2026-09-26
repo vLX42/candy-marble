@@ -4,7 +4,7 @@ extends RefCounted
 ## Keys: "level:<title>" for single levels, "run" for a full playthrough.
 ## Lower is better.
 
-const PATH := "user://scores.cfg"
+const PATH := "user://scores_v2.cfg"  # v2: the long levels
 const KEEP := 5
 
 var persist := true
@@ -36,6 +36,19 @@ func submit(key: String, time: float) -> int:
 	if persist:
 		_cfg.save(PATH)
 	return t.find(snappedf(time, 0.01))
+
+
+## How many levels are playable (level 1 is always unlocked).
+func unlocked() -> int:
+	return int(_cfg.get_value("progress", "unlocked", 1))
+
+
+func unlock(count: int) -> void:
+	if count <= unlocked():
+		return
+	_cfg.set_value("progress", "unlocked", count)
+	if persist:
+		_cfg.save(PATH)
 
 
 static func format_board(times: Array, highlight: int) -> String:

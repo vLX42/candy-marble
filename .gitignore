@@ -4,3 +4,4 @@
 tests/shots/
 .DS_Store
 blender/__pycache__/
+tools/__pycache__/

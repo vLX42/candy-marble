@@ -234,14 +234,14 @@ def checkpoint():
 
 # --- levels -------------------------------------------------------------------------
 
-def build(num, title, desc, par, tier, plan):
+def build(num, title, desc, par, tier, plan, race=False):
     c = Course(tier=tier)
     for step in plan:
         if isinstance(step, tuple) and step[0] == "turn":
             c.turn(step[1], bank=len(step) > 2)
         else:
             c.place(step)
-    c.write(os.path.join(OUT, f"level_{num}.gd"), num, title, desc, par)
+    c.write(os.path.join(OUT, f"level_{num}.gd"), num, title, desc, par, race)
 
 
 T = lambda d, bank=False: ("turn", d, "bank") if bank else ("turn", d)  # noqa: E731
@@ -255,12 +255,12 @@ def main():
         checkpoint(), hills(), straight(4), river(10), T(+1), waves(6), straight(3), loop(), T(-1),
         checkpoint(), bumpers(), sweepers(1), hills(), T(+1), river(), kicker(), waves(6), straight(3), finish(),
     ])
-    build(2, "Gumdrop Pinball", "Bumper tables, slingshots, speed-bank corners and loops, down a long pinball run.", 130, 5, [
+    build(2, "Gumdrop Pinball", "RACE vs the licorice ball. Bumper tables, slingshots, speed-bank corners and loops, down a long pinball run.", 130, 5, [
         start(), ramp_down(), table(), T(+1, True), bumpers(), checkpoint(), sweepers(2), loop(),
         T(-1, True), table(), straight(3), ramp_down(), bumpers(), T(+1, True), checkpoint(), spinners(),
         table(), loop(), T(-1, True), river(), drop(), bumpers(), sweepers(2, True), T(+1, True),
         checkpoint(), table(), waves(6), loop(), T(-1, True), bumpers(), straight(3), finish(),
-    ])
+    ], race=True)
     build(3, "Sprinkle Skies", "Island hopping: kicker jumps through hoops, cannon hops over the void, sweeper bridges.", 100, 1, [
         start(), straight(3), kicker(), T(+1), bridge(), checkpoint(), cannon_hop(), T(-1), sweepers(2),
         kicker(), straight(3), T(+1), checkpoint(), bridge(8), ramp_down(), waves(6), T(-1), cannon_hop(),
@@ -275,13 +275,13 @@ def main():
         river(10), waves(6), loop(), T(-1), hills(), sweepers(3), river(), T(+1), checkpoint(),
         bridge(8), loop(), straight(3), finish(),
     ])
-    build(5, "Candy Castle", "The long climb: ramps up tier after tier past fast sweepers, bridges and kickers to the top.", 165, 0, [
+    build(5, "Candy Castle", "RACE vs the licorice ball. The long climb: ramps up tier after tier past fast sweepers, bridges and kickers to the top.", 165, 0, [
         start(), straight(3), ramp_up(), sweepers(2), T(+1), bridge(), ramp_up(), checkpoint(), loop(),
         T(-1), sweepers(2, True), ramp_up(), kicker(), T(+1), checkpoint(), bridge(8), hills(),
         T(-1), sweepers(3, True), checkpoint(), cannon_hop(), T(+1), bumpers(), ramp_up(), loop(), T(-1),
         checkpoint(), bridge(), sweepers(2, True), kicker(), T(+1), waves(6), bumpers(), T(-1),
         checkpoint(), bridge(8), sweepers(3, True), loop(), T(+1), cannon_hop(), hills(), straight(3), finish(),
-    ])
+    ], race=True)
     build(6, "Pinball Parlor", "Pure speed run: tables, cannons, loops and speed banks. Keep it rolling.", 115, 4, [
         start(), table(), T(+1, True), loop(), cannon_hop(), T(-1, True), table(), spinners(), checkpoint(),
         loop(), T(+1, True), table(), ramp_down(), cannon_hop(), T(-1, True), checkpoint(), bumpers(),

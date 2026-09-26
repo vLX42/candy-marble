@@ -24,6 +24,7 @@ func _initialize() -> void:
 	main.auto_advance = false
 
 	main.save_scores = false
+	main.race_blocking = false
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--level="):
 			levels = [int(arg.get_slice("=", 1)) - 1]
@@ -38,6 +39,11 @@ func _process(delta: float) -> bool:
 	level_t += delta
 	var ball: Ball = main.ball
 	if main.finished:
+		# Race levels: also wait for the rival to cross the line (or give up).
+		if main.rival and main.rival_time < 0.0 and not main.rival.finished and level_t < MAX_SIM_TIME + 120.0 \
+				and "--rival" in OS.get_cmdline_user_args():
+			_release()
+			return false
 		_report(true)
 		return false
 	if level_t > MAX_SIM_TIME:
@@ -70,7 +76,7 @@ func _steer(ball: Ball) -> void:
 	var route := _route()
 	var pos := _flat(ball.global_position)
 	# Hands off while looping or flying.
-	if ball.global_position.y > main.level.height(pos.x, pos.y) + 1.1:
+	if ball.get_contact_count() == 0 and ball.global_position.y > main.level.height(pos.x, pos.y) + 1.1:
 		_release()
 		return
 	# Advance when close to the waypoint or already past it.
@@ -179,6 +185,8 @@ func _report(ok: bool) -> void:
 	var lvl: LevelBase = main.level
 	var line := "%s level %d %-16s bot %.1f s (par %.0f), falls %d" % [
 		"PASS" if ok else "FAIL", main.level_index + 1, lvl.title, level_t, lvl.time_limit, main.falls]
+	if main.rival:
+		line += "  | rival %s" % ("%.1f s" % main.rival_time if main.rival_time > 0 else "beaten, was at waypoint %d/%d" % [main.rival._wp, main.rival._route.size()])
 	if ok and level_t > lvl.time_limit:
 		line += "  WARN: bot slower than par"
 	results.append(line)

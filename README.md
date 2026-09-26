@@ -7,23 +7,33 @@ Roll the peppermint ball to the golf hole as fast as you can. Your score is
 your time: each level has a par (gold medal), silver at 1.3x and bronze at 1.7x
 par. Best level times and best full runs are saved locally.
 
+- **Title screen** with Play / Continue, level select (best times, medals),
+  fullscreen toggle. Levels unlock one by one as you finish them.
+- **Races**: on some levels the evil licorice ball races you to the hole. It
+  uses boosters, loops and cannons too, and you can bump each other around.
+  Win the race to clear the level.
+- **Sugar Rush**: pinball hits (bumpers, slingshots, spinners, rollovers,
+  hoops, targets, loops, cannons) fill the sugar meter. Full meter = 7 seconds
+  of rush: faster, grippier, and you phase straight through sweepers.
+
 ## Run
 
 ```bash
 godot --path .
 ```
 
-WASD / arrows / left stick to push the ball, R or Enter to restart the level.
+WASD / arrows / left stick to push the ball, R to restart the level, Esc for
+the menu, F11 or Alt+Enter for fullscreen.
 
 ## Levels
 
 | # | Level | Par | What's in it |
 |---|---|---|---|
 | 1 | Sugar Lane | 155 s | Long friendly tour with rails: waves, hills, bumpers, loops, rivers, jumps |
-| 2 | Gumdrop Pinball | 130 s | Bumper tables, slingshots, speed-bank corners and loops |
+| 2 | Gumdrop Pinball | 130 s | RACE. Bumper tables, slingshots, speed-bank corners and loops |
 | 3 | Sprinkle Skies | 100 s | Island hopping: kicker jumps through hoops, cannon hops, sweeper bridges |
 | 4 | Licorice Loops | 210 s | Loops, candy rivers and drops, sweepers on every other bend |
-| 5 | Candy Castle | 165 s | The long climb: ramps up past fast sweepers, bridges, kickers and cannons |
+| 5 | Candy Castle | 165 s | RACE. The long climb: ramps up past fast sweepers, bridges, kickers and cannons |
 | 6 | Pinball Parlor | 115 s | Speed run: tables, cannons, loops, speed banks |
 
 ## Making levels

@@ -53,6 +53,8 @@ var max_speed := 0.0
 var max_y := -100.0
 var mark := 0
 var landing := Vector3.INF
+var rush_checked := false
+var rush_charged := false
 var results: Array[String] = []
 var failed := false
 
@@ -131,9 +133,23 @@ func _process(delta: float) -> bool:
 			if pt > 3.5:
 				_check("cannon lands the ball on target", landing.distance_to(Vector3(3, 0.5, 27)) < 2.0 and ball.alive,
 					"landed=%s" % landing.snapped(Vector3.ONE * 0.1))
+				_teleport(Vector3(19.0, 0.6, 3.0), Vector3.ZERO)
+				_next()
+		10:  # Sugar Rush: fill the meter, then sit in the sweeper's path
+			if not rush_charged:
+				rush_charged = true
+				mark = main.falls
+				for k in 6:  # exactly one full meter
+					main.charge(1.0, ball.global_position)
+			if pt > 0.2 and not rush_checked:
+				rush_checked = true
+				_check("pinball hits trigger sugar rush", ball.rush and ball.max_speed > 10.0,
+					"rush=%s max_speed=%.1f" % [ball.rush, ball.max_speed])
+			if pt > 3.5:
+				_check("sweepers can't pop a rushing ball", main.falls == mark, "falls %d -> %d" % [mark, main.falls])
 				_teleport(Vector3(9.0 - 2.5, 0.6, 5.0), Vector3(1.5, 0, 0))
 				_next()
-		10:  # hole at tile (4,2) = (9, 5)
+		11:  # hole at tile (4,2) = (9, 5)
 			if main.finished or pt > 4.0:
 				_check("ball drops in the hole", main.finished, "pos=%s" % ball.global_position.snapped(Vector3.ONE * 0.1))
 				print("\n".join(results))

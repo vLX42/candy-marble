@@ -1,3 +1,4 @@
+class_name MainGame
 extends Node3D
 ## Game loop: loads levels, runs the Marble Madness style countdown (time left
 ## carries over to the next level), handles death, checkpoints, the golf hole,
@@ -22,7 +23,11 @@ const SCENES := {
 	"decor": preload("res://scenes/decor.tscn"),
 	"loop": preload("res://scenes/loop.tscn"),
 	"pinball": preload("res://scenes/pinball.tscn"),
+	"rival": preload("res://scenes/rival.tscn"),
 }
+## Sugar Rush: pinball hits fill the meter; full = a few seconds of rush.
+const RUSH_HITS := 6.0
+const RUSH_TIME := 7.0
 ## Medal thresholds as multiples of the level's par time.
 const MEDALS := [[1.0, "GOLD"], [1.3, "SILVER"], [1.7, "BRONZE"]]
 
@@ -35,9 +40,14 @@ const NEXT_LEVEL_DELAY := 3.0
 ## Entity dictionary keys that are not node properties.
 const META_KEYS := ["type", "pos", "yaw", "ground_tile"]
 
+## Set by the title screen before switching to this scene (-1 = use first_level).
+static var requested_level := -1
+
 @export var first_level := 0
 ## Off for tests: stay on the level after reaching the goal.
 @export var auto_advance := true
+## Off for tests: losing a race doesn't stop the level.
+@export var race_blocking := true
 ## Off for tests: don't write high scores.
 @export var save_scores := true
 
@@ -45,6 +55,10 @@ var level: LevelBase
 var level_index := 0
 var world: Node3D
 var ball: Ball
+var rival: Rival
+var race_lost := false
+var rival_time := -1.0
+var _route_world: Array[Vector2] = []
 var camera: Camera3D
 var sfx: Sfx
 var scores: Scores
@@ -52,6 +66,8 @@ var level_time := 0.0
 var total_time := 0.0
 var falls := 0
 var level_falls := 0
+var rush_meter := 0.0
+var rush_left := 0.0
 var finished := false
 var game_complete := false
 
@@ -60,6 +76,8 @@ var _hud_time: Label
 var _hud_best: Label
 var _hud_message: Label
 var _hud_board: Label
+var _hud_rush: ProgressBar
+var _hud_rush_label: Label
 
 var _message_token := 0
 var _shake := 0.0
@@ -74,6 +92,9 @@ func _ready() -> void:
 	_setup_hud()
 	sfx = Sfx.new()
 	add_child(sfx)
+	if requested_level >= 0:
+		first_level = requested_level
+		requested_level = -1
 	start_level(first_level)
 
 
@@ -130,6 +151,8 @@ func load_level(data: LevelBase) -> void:
 	finished = false
 	level_time = 0.0
 	level_falls = 0
+	rush_meter = 0.0
+	rush_left = 0.0
 	_hud_board.text = ""
 
 	world = Node3D.new()
@@ -144,14 +167,29 @@ func load_level(data: LevelBase) -> void:
 	ball.position = ground(level.spawn) + Vector3.UP * 0.6
 	world.add_child(ball)
 	ball.died.connect(_on_ball_died)
+	rival = null
+	race_lost = false
+	rival_time = -1.0
+	_route_world.clear()
+	for t in level.route:
+		_route_world.append(level.tile_center_f(t))
+	if level.race:
+		rival = SCENES.rival.instantiate()
+		rival.level = level
+		rival.position = ground(level.spawn + Vector2(0, LevelBase.TILE)) + Vector3.UP * 0.6
+		world.add_child(rival)
 	for e in level.entities:
 		var node := _place(e)
 		if node is Goal:
 			node.reached.connect(_on_goal)
+			node.rival_reached.connect(_on_rival_goal)
 
 	camera.global_position = _camera_target()
 	_update_best_label()
-	show_message("%s\npar %.0f s" % [level.title, level.time_limit], 2.5)
+	var intro := "%s\npar %.0f s" % [level.title, level.time_limit]
+	if level.race:
+		intro = "%s\nRACE the licorice ball!" % level.title
+	show_message(intro, 3.0)
 
 
 func _place(e: Dictionary) -> Node3D:
@@ -188,6 +226,12 @@ func _process(delta: float) -> void:
 	var over_par := level_time > level.time_limit
 	_hud_time.add_theme_color_override("font_color", Palette.RASPBERRY if over_par else Palette.INK)
 	_hud_level.text = "Level %d  %s\nPar %.0f s   Falls %d" % [level_index + 1, level.title, level.time_limit, falls]
+	_update_rush(delta)
+	if rival:
+		var place := "1st" if race_position() == 1 else "2nd"
+		if race_lost:
+			place = "LOST"
+		_hud_level.text += "\nRACE  %s" % place
 
 	var k := 1.0 - exp(-CAMERA_FOLLOW * delta)
 	camera.global_position = camera.global_position.lerp(_camera_target(), k)
@@ -199,6 +243,9 @@ func _process(delta: float) -> void:
 		camera.h_offset = 0.0
 		camera.v_offset = 0.0
 
+	if Input.is_action_just_pressed("ui_cancel"):
+		get_tree().change_scene_to_file("res://scenes/title.tscn")
+		return
 	if Input.is_action_just_pressed("restart"):
 		if game_complete:
 			game_complete = false
@@ -207,6 +254,61 @@ func _process(delta: float) -> void:
 			start_level(0)
 		else:
 			start_level(level_index)
+
+
+## Pinball toys call this. Only hits near the player count.
+func charge(amount: float, at: Vector3) -> void:
+	if ball == null or finished or rush_left > 0.0:
+		return
+	if at.distance_to(ball.global_position) > 4.0:
+		return
+	rush_meter = minf(1.0, rush_meter + amount / RUSH_HITS)
+	if rush_meter >= 0.999:
+		rush_meter = 0.0
+		rush_left = RUSH_TIME
+		ball.rush = true
+		sfx.play("boost")
+		cheer("SUGAR RUSH!", ball.global_position + Vector3.UP * 2.2)
+		if _music:
+			_music.pitch_scale = 1.08
+
+
+func _update_rush(delta: float) -> void:
+	if rush_left > 0.0:
+		rush_left -= delta
+		_hud_rush.value = rush_left / RUSH_TIME
+		_hud_rush_label.text = "SUGAR RUSH  %.1f" % maxf(rush_left, 0.0)
+		if rush_left <= 0.0 or finished:
+			rush_left = 0.0
+			ball.rush = false
+			if _music:
+				_music.pitch_scale = 1.0
+	else:
+		_hud_rush.value = rush_meter
+		_hud_rush_label.text = "sugar"
+
+
+## 1 if the player is ahead of the rival along the route, else 2.
+func race_position() -> int:
+	if rival == null:
+		return 1
+	if rival.finished:
+		return 1 if finished and not race_lost else 2
+	var me := LevelBase.route_progress(_route_world, Vector2(ball.global_position.x, ball.global_position.z))
+	var them := LevelBase.route_progress(_route_world, Vector2(rival.global_position.x, rival.global_position.z))
+	return 1 if me >= them else 2
+
+
+func _on_rival_goal() -> void:
+	rival_time = level_time
+	if finished:
+		return
+	race_lost = true
+	sfx.play("timeup")
+	cheer("RIVAL WINS", rival.global_position + Vector3.UP * 1.5)
+	if race_blocking:
+		finished = true
+		show_message("The licorice ball won the race!\nR to try again")
 
 
 func _camera_target() -> Vector3:
@@ -224,9 +326,14 @@ func _on_ball_died() -> void:
 
 
 func _on_goal() -> void:
-	if finished:
+	if finished and not (race_lost and not race_blocking):
 		return
 	finished = true
+	if rival and not race_lost:
+		rival.finished = true
+		cheer("YOU WIN THE RACE!", ball.global_position + Vector3.UP * 2.6)
+	if not race_lost:
+		scores.unlock(level_index + 2)
 	sfx.play("goal")
 	burst(ball.global_position + Vector3.UP * 0.8, [Palette.LEMON, Palette.PINK, Palette.MINT, Palette.LILAC, Palette.SKY], 60, 7.0)
 	var rank := scores.submit(_score_key(), level_time)
@@ -266,13 +373,15 @@ func _update_best_label() -> void:
 	_hud_best.text = "Best %.2f" % best if best > 0.0 else ""
 
 
-func on_bump(_pos: Vector3) -> void:
+func on_bump(pos: Vector3) -> void:
 	sfx.play("boing")
 	_shake = maxf(_shake, 0.12)
+	charge(1.0, pos)
 
 
-func on_boost(_pos: Vector3) -> void:
+func on_boost(pos: Vector3) -> void:
 	sfx.play("boost", -9.0)
+	charge(0.5, pos)
 
 
 func on_checkpoint(_pos: Vector3) -> void:
@@ -359,7 +468,7 @@ func _setup_input() -> void:
 		"down": [KEY_S, KEY_DOWN],
 		"left": [KEY_A, KEY_LEFT],
 		"right": [KEY_D, KEY_RIGHT],
-		"restart": [KEY_R, KEY_ENTER],
+		"restart": [KEY_R],
 	}
 	var axes := {
 		"up": [JOY_AXIS_LEFT_Y, -1.0],
@@ -467,6 +576,35 @@ func _setup_hud() -> void:
 	_hud_message.offset_top = 120.0
 	_hud_message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	layer.add_child(_hud_message)
+
+	_hud_rush = ProgressBar.new()
+	_hud_rush.show_percentage = false
+	_hud_rush.max_value = 1.0
+	_hud_rush.anchor_left = 1.0
+	_hud_rush.anchor_right = 1.0
+	_hud_rush.offset_left = -300.0
+	_hud_rush.offset_right = -28.0
+	_hud_rush.offset_top = 118.0
+	_hud_rush.offset_bottom = 142.0
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(1, 1, 1, 0.7)
+	bg.set_corner_radius_all(12)
+	bg.border_color = Palette.PINK
+	bg.set_border_width_all(3)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = Palette.CORAL
+	fill.set_corner_radius_all(12)
+	_hud_rush.add_theme_stylebox_override("background", bg)
+	_hud_rush.add_theme_stylebox_override("fill", fill)
+	layer.add_child(_hud_rush)
+	_hud_rush_label = _label(20)
+	_hud_rush_label.anchor_left = 1.0
+	_hud_rush_label.anchor_right = 1.0
+	_hud_rush_label.offset_left = -300.0
+	_hud_rush_label.offset_right = -28.0
+	_hud_rush_label.offset_top = 144.0
+	_hud_rush_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	layer.add_child(_hud_rush_label)
 
 	_hud_board = _label(26)
 	_hud_board.anchor_left = 0.5

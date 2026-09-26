@@ -42,3 +42,4 @@ func _on_entry(body: Node3D) -> void:
 		body.call_deferred("align_to_lane", global_position, global_basis.z.normalized(), LAUNCH_SPEED)
 		get_tree().call_group("game", "on_boost", global_position)
 		get_tree().call_group("game", "cheer", "LOOP!", global_position + Vector3.UP * 4.8)
+		get_tree().call_group("game", "charge", 2.0, body.global_position)

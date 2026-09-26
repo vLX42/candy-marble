@@ -67,6 +67,7 @@ func _solid(size: Vector3, offset: Vector3) -> StaticBody3D:
 
 
 func _score(_points: int, label: String = "") -> void:
+	get_tree().call_group("game", "charge", 1.0, global_position)
 	if label != "":
 		get_tree().call_group("game", "cheer", label, global_position + Vector3.UP * 1.6)
 

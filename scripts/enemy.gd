@@ -81,4 +81,8 @@ func position_at(ahead: float) -> Vector3:
 
 func _on_hit(body: Node3D) -> void:
 	if body is Ball:
+		if body.rush:
+			# Sugar Rush: the ball phases straight through.
+			get_tree().call_group("game", "cheer", "WHOOSH!", global_position + Vector3.UP * 2.0)
+			return
 		body.die()

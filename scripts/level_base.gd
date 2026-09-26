@@ -41,6 +41,8 @@ var objects: PackedStringArray = []
 var extras: Array[Dictionary] = []
 ## Waypoints for the test bot, in tile units (Vector2(3, 1) = centre of tile 3,1).
 var route: Array[Vector2] = []
+## Race level: the evil licorice ball races you to the hole.
+var race := false
 var tier_colors: Array[Color] = [
 	Palette.MINT, Palette.LILAC, Color("#BFE3F7"), Color("#F9C6D3"), Color("#FFE7B3"),
 ]
@@ -112,6 +114,21 @@ func tile_center(i: int, j: int) -> Vector2:
 
 func tile_center_f(t: Vector2) -> Vector2:
 	return (t + Vector2(0.5, 0.5)) * TILE
+
+
+## How far along a world-space route a point is (segment index + fraction).
+static func route_progress(route: Array[Vector2], pos: Vector2, _hint: int = 0) -> float:
+	var best := 0.0
+	var best_d := INF
+	for i in route.size() - 1:
+		var a := route[i]
+		var b := route[i + 1]
+		var q := Geometry2D.get_closest_point_to_segment(pos, a, b)
+		var d := q.distance_to(pos)
+		if d < best_d:
+			best_d = d
+			best = i + a.distance_to(q) / maxf(a.distance_to(b), 0.001)
+	return best
 
 
 func tile_at(x: float, z: float) -> Vector2i:

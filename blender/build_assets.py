@@ -161,6 +161,22 @@ def build_ball():
     export("ball")
 
 
+def build_rival():
+    """Evil licorice marble: glossy black with raspberry swirls, diameter 1."""
+    reset()
+    PALETTE["licorice"] = "#1E1418"
+    o = sphere(0.5, (0, 0, 0), material("licorice", 0.18, 0.9), seg=96, rings=48)
+    o.data.materials.append(material("raspberry", 0.2, 0.8))
+    for p in o.data.polygons:
+        c = p.center
+        theta = math.atan2(c.y, c.x)
+        phi = math.acos(max(-1.0, min(1.0, c.z / 0.5)))
+        band = (theta / math.pi * 1.5 - phi / math.pi * 2.2) % 1.0
+        if band < 0.12 or 0.33 <= band < 0.45 or 0.66 <= band < 0.78:
+            p.material_index = 1
+    export("rival")
+
+
 def build_enemy():
     """Wind-up spiky raspberry block, 1 x 1 x 1.15 body, face towards -Y (Godot +Z)."""
     reset()
@@ -383,6 +399,7 @@ def build_islet():
 
 BUILDERS = {
     "ball": build_ball,
+    "rival": build_rival,
     "enemy": build_enemy,
     "bumper": build_bumper,
     "booster": build_booster,
