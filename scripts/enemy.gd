@@ -14,6 +14,7 @@ var _visual: Node3D
 
 
 func _ready() -> void:
+	add_to_group("enemy")
 	sync_to_physics = true
 	_origin = global_position
 	_time = phase * period
@@ -27,7 +28,7 @@ func _ready() -> void:
 
 	var hit := Area3D.new()
 	var hit_shape := BoxShape3D.new()
-	hit_shape.size = Vector3(1.2, 1.5, 1.2)
+	hit_shape.size = Vector3(1.1, 1.5, 1.1)
 	var hcs := CollisionShape3D.new()
 	hcs.shape = hit_shape
 	hcs.position.y = 0.75
@@ -35,7 +36,12 @@ func _ready() -> void:
 	add_child(hit)
 	hit.body_entered.connect(_on_hit)
 
-	_visual = get_node("Model") if has_node("Model") else _build_placeholder()
+	if has_node("Model"):
+		_visual = get_node("Model")
+	else:
+		_visual = Palette.load_model(self, "enemy")
+		if _visual == null:
+			_visual = _build_placeholder()
 
 
 func _build_placeholder() -> Node3D:
@@ -65,6 +71,12 @@ func _physics_process(delta: float) -> void:
 	var moving := travel * sin(t)
 	if moving.length() > 0.01:
 		_visual.rotation.y = atan2(moving.x, moving.z)
+
+
+## Where the enemy will be `ahead` seconds from now (used by the test bot).
+func position_at(ahead: float) -> Vector3:
+	var t := (_time + ahead) / period * TAU
+	return _origin + travel * (1.0 - cos(t)) * 0.5
 
 
 func _on_hit(body: Node3D) -> void:

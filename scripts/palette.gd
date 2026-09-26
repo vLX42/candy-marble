@@ -8,12 +8,25 @@ const LEMON := Color("#F6E27A")
 const LILAC := Color("#C9B8EC")
 const SKY := Color("#A9D6F5")
 const BASE := Color("#E9A99A")
+const ISLAND_SIDE := Color("#F7C9B8")
 const RASPBERRY := Color("#C8204F")
 const CORAL := Color("#F6845E")
 const CREAM := Color("#FFF4E0")
 const WHITE := Color("#FBF8F4")
 const INK := Color("#3A1F2B")
 const BACKGROUND := Color("#D6ECF8")
+
+
+## Instances models/<name>.glb (built by blender/build_assets.py) as a child
+## named "Model". Returns null if the model doesn't exist.
+static func load_model(parent: Node3D, model_name: String) -> Node3D:
+	var path := "res://models/%s.glb" % model_name
+	if not ResourceLoader.exists(path):
+		return null
+	var m: Node3D = load(path).instantiate()
+	m.name = "Model"
+	parent.add_child(m)
+	return m
 
 
 ## Opaque satin "vinyl toy" material.

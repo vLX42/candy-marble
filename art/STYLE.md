@@ -33,3 +33,15 @@ Raspberry is reserved for danger. Nothing friendly may use it.
 - Bevel modifier on everything, flat colors, no textures.
 - Booster is flush with the floor. Goal cup is sunken into a floor tile.
 - Keep colliders simple: bumper = cylinder as wide as the cap.
+
+## In-game look (current target)
+
+Peter's Nano Banana restyle of the greybox set the direction:
+
+- Every 2x2 tile is its own pillowy block with deep seams (terrain shader).
+- Island sides are chocolate cake, ramps are glossy lemon icing that drips
+  over the edges.
+- Blue to pink gradient sky, clouds under the islands, floating candy scenery
+  (rainbow, islets, balloons, castle...) far below the play area.
+- Marble Madness references: wavy ground tiles (`W`), long rail-less
+  walkways, stacked platforms with drops.

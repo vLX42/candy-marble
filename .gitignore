@@ -3,3 +3,4 @@
 /android/
 tests/shots/
 .DS_Store
+blender/__pycache__/

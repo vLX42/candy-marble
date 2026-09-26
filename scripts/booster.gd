@@ -16,7 +16,7 @@ func _ready() -> void:
 	cs.position.y = 0.3
 	add_child(cs)
 	body_entered.connect(_on_body_entered)
-	if not has_node("Model"):
+	if not has_node("Model") and Palette.load_model(self, "booster") == null:
 		_build_placeholder()
 
 
@@ -43,3 +43,4 @@ func _process(_delta: float) -> void:
 func _on_body_entered(body: Node3D) -> void:
 	if body is Ball:
 		body.call_deferred("boost", global_basis.z.normalized(), speed)
+		get_tree().call_group("game", "on_boost", global_position)

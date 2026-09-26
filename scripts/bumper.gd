@@ -28,7 +28,12 @@ func _ready() -> void:
 	add_child(area)
 	area.body_entered.connect(_on_body_entered)
 
-	_visual = get_node("Model") if has_node("Model") else _build_placeholder()
+	if has_node("Model"):
+		_visual = get_node("Model")
+	else:
+		_visual = Palette.load_model(self, "bumper")
+		if _visual == null:
+			_visual = _build_placeholder()
 
 
 func _build_placeholder() -> Node3D:
@@ -51,6 +56,7 @@ func _on_body_entered(body: Node3D) -> void:
 	if away.length() < 0.01:
 		away = Vector3.RIGHT
 	body.call_deferred("kick", away.normalized(), strength)
+	get_tree().call_group("game", "on_bump", global_position)
 	var tw := create_tween()
 	tw.tween_property(_visual, "scale", Vector3(1.25, 0.8, 1.25), 0.06)
 	tw.tween_property(_visual, "scale", Vector3.ONE, 0.25).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
