@@ -226,6 +226,19 @@ func _build_ui() -> void:
 	hint.offset_left = 84
 	hint.offset_top = -56
 	root.add_child(hint)
+	var ver := Label.new()
+	var v := str(ProjectSettings.get_setting("application/config/version", "dev"))
+	ver.text = "dev build" if v == "dev" else "v" + v
+	CandyText.style(ver, 18, CandyText.CHOCOLATE, false)
+	ver.anchor_left = 1.0
+	ver.anchor_right = 1.0
+	ver.anchor_top = 1.0
+	ver.anchor_bottom = 1.0
+	ver.offset_left = -160
+	ver.offset_right = -24
+	ver.offset_top = -48
+	ver.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	root.add_child(ver)
 	_front = [logo, sub, hint]
 
 	_quests = QuestBrowser.new()

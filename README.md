@@ -172,15 +172,19 @@ last level.
 
 `.github/workflows/build.yml` runs on every push: all tests and level bots, then
 Windows, macOS (universal, ad-hoc signed), Linux and Web exports
-(`export_presets.cfg`). Pushes to main deploy `site/` plus the web build (under
-`/play`) to GitHub Pages. Pushing a tag like `v1.0.1` also publishes a GitHub
-release with `CandyMarble-windows.zip`, `CandyMarble-macos.zip` and
-`CandyMarble-linux.zip`; the site links to `releases/latest`, so it always
-serves the newest one.
+(`export_presets.cfg`). On `main` it also:
 
-```bash
-git tag v1.0.1 && git push origin v1.0.1
-```
+- works out the version from the commit messages since the last release
+  (`tools/next_version.py`): `feat:` = minor, `fix:` and anything else = patch,
+  `feat!:` or `BREAKING` in the body = major; commits that are only `docs:`,
+  `ci:`, `test:` or `chore:` don't make a release,
+- stamps it into the builds (shown on the title screen) and the site,
+- deploys `site/` plus the web build (under `/play`) to GitHub Pages,
+- publishes a GitHub release `vX.Y.Z` with `CandyMarble-windows.zip`,
+  `CandyMarble-macos.zip`, `CandyMarble-linux.zip` and notes grouped into
+  New / Fixes / Other. The site links to `releases/latest`.
+
+Preview what the next push would release: `python3 tools/next_version.py notes.md`.
 
 Sounds are made by `tools/make_sfx.py`, the app icon by
 `tools/make_app_icon.gd`.

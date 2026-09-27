@@ -1,13 +1,15 @@
 name: Build
 
 # Every push: tests + level bots, then Windows / macOS / Linux / Web exports.
-# Pushes to main: the site (with the web build under /play) goes to GitHub Pages.
-# Tags v*: a GitHub release with the three desktop zips.
+# Pushes to main: the version is worked out from the commit messages since the
+# last release (tools/next_version.py: feat = minor, fix/other = patch,
+# ! or BREAKING = major, docs/ci/test/chore only = no release), stamped into
+# the builds and the site, the site goes to GitHub Pages and a GitHub release
+# with the three desktop zips and grouped notes is published.
 
 on:
   push:
     branches: [main]
-    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
@@ -52,8 +54,29 @@ jobs:
           godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/marble_madness.json
           godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/sweet_starter.json
 
+  version:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.next.outputs.version }}
+      release: ${{ steps.next.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: next
+        run: |
+          python3 tools/next_version.py notes.md >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+          cat notes.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: notes.md
+
   export:
-    needs: test
+    needs: [test, version]
+    if: always() && needs.test.result == 'success' && needs.version.result != 'failure'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -80,6 +103,16 @@ jobs:
           mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
           mv templates/* ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/
 
+      - name: Stamp the version
+        env:
+          VERSION: ${{ needs.version.outputs.version || '0.0.0-dev' }}
+        run: |
+          sed -i "s/^config\/version=.*/config\/version=\"$VERSION\"/" project.godot
+          NUM="${VERSION%%-*}"
+          sed -i "s/^application\/short_version=.*/application\/short_version=\"$NUM\"/; s/^application\/version=.*/application\/version=\"$NUM\"/" export_presets.cfg
+          sed -i "s/^application\/file_version=.*/application\/file_version=\"$NUM.0\"/; s/^application\/product_version=.*/application\/product_version=\"$NUM.0\"/" export_presets.cfg
+          grep -n "config/version" project.godot
+
       - name: Import assets
         run: godot --headless --import || godot --headless --import
 
@@ -102,6 +135,7 @@ jobs:
           cp build/macos/CandyMarble-macos.zip dist/
           mkdir -p public
           cp -r site/. public/
+          sed -i "s/{{VERSION}}/${{ needs.version.outputs.version || 'dev' }}/g" public/index.html
           cp -r build/web public/play
           ls -la dist public
 
@@ -117,7 +151,7 @@ jobs:
           path: public
 
   pages:
-    needs: export
+    needs: [export]
     # The github-pages environment only accepts main; tags just make releases.
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -132,8 +166,8 @@ jobs:
         uses: actions/deploy-pages@v4
 
   release:
-    needs: export
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [export, version]
+    if: needs.version.outputs.release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -142,13 +176,14 @@ jobs:
         with:
           name: candy-marble-builds
           path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-notes
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/*.zip \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "Candy Marble ${GITHUB_REF_NAME#v}" \
-            --notes "Download the zip for your system. Or play it in the browser: https://vlx42.github.io/candy-marble/play/
-
-          macOS: the app isn't notarized, so the first time right-click it and pick Open."
+          gh release create "v$VERSION" dist/*.zip \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Candy Marble $VERSION" --notes-file notes.md
