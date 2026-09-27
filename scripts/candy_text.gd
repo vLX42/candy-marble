@@ -51,4 +51,9 @@ static func style_3d(l: Label3D, fill: Color) -> void:
 	l.font = FONT_BOLD
 	l.modulate = fill
 	l.outline_modulate = CHOCOLATE
-	l.outline_size = 22
+	l.outline_size = 18
+	# Skip fog and tone mapping so the pastels stay bright.
+	l.shaded = false
+	l.fixed_size = false
+	l.render_priority = 10
+	l.outline_render_priority = 9

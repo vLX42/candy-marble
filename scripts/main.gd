@@ -76,17 +76,7 @@ var rush_left := 0.0
 var finished := false
 var game_complete := false
 
-var _hud_level: Label
-var _hud_time: Label
-var _hud_best: Label
-var _hud_message: RichTextLabel
-var _hud_board: Label
-var _hud_rush: ProgressBar
-var _hud_rush_label: Label
-
-var _message_token := 0
-## Shown again when a timed message runs out (e.g. "the rival won").
-var _sticky_message := ""
+var hud: Hud
 var _shake := 0.0
 var _cam_yaw := deg_to_rad(45.0)
 var _env: Environment
@@ -160,12 +150,10 @@ func load_level(data: LevelBase) -> void:
 	level = data
 	level.build()
 	finished = false
-	_sticky_message = ""
 	level_time = 0.0
 	level_falls = 0
 	rush_meter = 0.0
 	rush_left = 0.0
-	_hud_board.text = ""
 
 	world = Node3D.new()
 	world.name = "World"
@@ -199,10 +187,11 @@ func load_level(data: LevelBase) -> void:
 	_cam_yaw = _track_yaw() if Settings.camera_follow else deg_to_rad(45.0)
 	camera.rotation = Vector3(deg_to_rad(CAMERA_ROTATION.x), _cam_yaw, 0.0)
 	camera.global_position = _camera_target()
+	hud.set_level(level_index + 1, level.title, level.time_limit, level.race)
 	_update_best_label()
-	var intro := "%s\npar %.0f s" % [level.title, level.time_limit]
+	var intro := "%s\nPar %.0f s.  Roll to the hole!" % [level.title, level.time_limit]
 	if level.race:
-		intro = "%s\nRACE the licorice ball!" % level.title
+		intro = "%s\nRace the licorice ball to the hole!" % level.title
 	show_message(intro, 3.0)
 
 
@@ -238,16 +227,11 @@ func _process(delta: float) -> void:
 	if not finished and not game_complete:
 		total_time += delta
 		level_time += delta
-	_hud_time.text = "%.2f" % level_time
-	var over_par := level_time > level.time_limit
-	_hud_time.add_theme_color_override("font_color", Palette.RASPBERRY if over_par else CandyText.PASTELS[0])
-	_hud_level.text = "Level %d  %s\nPar %.0f s   Falls %d" % [level_index + 1, level.title, level.time_limit, falls]
+	var place := "1st" if race_position() == 1 else "2nd"
+	if race_lost:
+		place = "LOST"
+	hud.update(level_time, level_time > level.time_limit, falls, place)
 	_update_rush(delta)
-	if rival:
-		var place := "1st" if race_position() == 1 else "2nd"
-		if race_lost:
-			place = "LOST"
-		_hud_level.text += "\nRACE  %s" % place
 
 	var target_yaw := _track_yaw() if Settings.camera_follow else deg_to_rad(45.0)
 	_cam_yaw = lerp_angle(_cam_yaw, target_yaw, 1.0 - exp(-CAMERA_TURN * delta))
@@ -296,16 +280,14 @@ func charge(amount: float, at: Vector3) -> void:
 func _update_rush(delta: float) -> void:
 	if rush_left > 0.0:
 		rush_left -= delta
-		_hud_rush.value = rush_left / RUSH_TIME
-		_hud_rush_label.text = "SUGAR RUSH  %.1f" % maxf(rush_left, 0.0)
+		hud.set_rush(rush_left / RUSH_TIME, true, rush_left)
 		if rush_left <= 0.0 or finished:
 			rush_left = 0.0
 			ball.rush = false
 			if _music:
 				_music.pitch_scale = 1.0
 	else:
-		_hud_rush.value = rush_meter
-		_hud_rush_label.text = "sugar"
+		hud.set_rush(rush_meter, false, 0.0)
 
 
 ## 1 if the player is ahead of the rival along the route, else 2.
@@ -327,8 +309,8 @@ func _on_rival_goal() -> void:
 	race_lost = true
 	sfx.play("timeup")
 	cheer("RIVAL WINS", rival.global_position + Vector3.UP * 1.5)
-	_sticky_message = "The licorice ball got there first!\nR to race again"
-	show_message(_sticky_message)
+	hud.sticky = "Rival wins!\nThe licorice ball got there first.  Finish anyway, or R to race again"
+	show_message(hud.sticky)
 
 
 ## Camera yaw that points the track just ahead of the ball up the screen.
@@ -370,35 +352,41 @@ func _on_goal() -> void:
 		return
 	finished = true
 	if race_lost:
-		_sticky_message = ""
 		sfx.play("pop")
-		cheer("2ND", ball.global_position + Vector3.UP * 1.5)
-		show_message("2nd place.  The licorice ball won by %.2f s\nR to race again    Esc for menu" % (level_time - rival_time))
+		hud.show_results({title = "2nd place", time = level_time,
+			info = "The licorice ball won by %.2f s" % (level_time - rival_time),
+			hint = "R  race again      Esc  menu"})
 		return
 	if rival and not race_lost:
 		rival.finished = true
-		cheer("YOU WIN THE RACE!", ball.global_position + Vector3.UP * 2.6)
 	scores.unlock(level_index + 2)
 	sfx.play("goal")
 	burst(ball.global_position + Vector3.UP * 0.8, [Palette.LEMON, Palette.PINK, Palette.MINT, Palette.LILAC, Palette.SKY], 60, 7.0)
 	var rank := scores.submit(_score_key(), level_time)
-	_hud_board.text = "Best times\n" + Scores.format_board(scores.top(_score_key()), rank)
 	_update_best_label()
-	var badge := "  NEW BEST!" if rank == 0 else ("  #%d on the board" % (rank + 1) if rank > 0 else "")
 	var medal := medal_for(level_time, level.time_limit)
-	var medal_text := "%s medal" % medal if medal != "" else "over par"
-	cheer(medal if medal != "" else "IN!", ball.global_position + Vector3.UP * 1.5)
+	var res := {
+		title = "You win the race!" if rival else "In the hole!",
+		time = level_time, medal = medal,
+		badge = "NEW BEST!" if rank == 0 else ("#%d ON THE BOARD" % (rank + 1) if rank > 0 else ""),
+		info = "Par %.0f s   Falls %d" % [level.time_limit, level_falls],
+		board_title = "BEST TIMES", board = scores.top(_score_key()), highlight = rank,
+		hint = "Next level coming up...      R  retry" if auto_advance else "R  retry      Esc  menu",
+	}
 	var idx := level_index
 	if idx == LEVELS.size() - 1:
 		game_complete = true
 		play_music(FINISH_MUSIC)
 		var run_rank := scores.submit("run", total_time)
-		var run_badge := "  NEW RECORD!" if run_rank == 0 else ""
-		_hud_board.text = "Best runs\n" + Scores.format_board(scores.top("run"), run_rank)
-		show_message("In the hole!  %.2f s  %s%s\nAll %d levels: %.2f s, %d falls%s\nR to play again" % [
-			level_time, medal_text, badge, LEVELS.size(), total_time, falls, run_badge])
+		res.title = "All %d levels done!" % LEVELS.size()
+		res.info = "Whole run %.2f s   %d falls%s" % [total_time, falls, "   NEW RECORD!" if run_rank == 0 else ""]
+		res.board_title = "BEST RUNS"
+		res.board = scores.top("run")
+		res.highlight = run_rank
+		res.hint = "R  play again      Esc  menu"
+		hud.show_results(res)
 		return
-	show_message("In the hole!  %.2f s  %s%s" % [level_time, medal_text, badge])
+	hud.show_results(res)
 	if not auto_advance:
 		return
 	await get_tree().create_timer(NEXT_LEVEL_DELAY).timeout
@@ -415,7 +403,7 @@ static func medal_for(time: float, par: float) -> String:
 
 func _update_best_label() -> void:
 	var best := scores.best(_score_key())
-	_hud_best.text = "best  %.2f" % best if best > 0.0 else "no best time yet"
+	hud.set_best(best)
 
 
 func on_bump(pos: Vector3) -> void:
@@ -443,7 +431,7 @@ func on_checkpoint(_pos: Vector3) -> void:
 
 ## Little floating shout for fun moments (loops, cannons, medals).
 func cheer(text: String, at: Vector3) -> void:
-	_popup(text, at, Palette.CORAL, 1.3)
+	_popup(text, at, CandyText.PASTELS[2], 1.3)
 
 
 func _popup(text: String, at: Vector3, col: Color, size: float = 1.0) -> void:
@@ -456,8 +444,13 @@ func _popup(text: String, at: Vector3, col: Color, size: float = 1.0) -> void:
 	CandyText.style_3d(l, col)
 	world.add_child(l)
 	l.global_position = at
+	l.scale = Vector3.ONE * 0.4
 	var tw := l.create_tween().set_parallel()
+	tw.tween_property(l, "scale", Vector3.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_property(l, "global_position:y", at.y + 1.6, 0.9).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	tw.tween_property(l, "modulate:a", 0.0, 0.4).set_delay(1.1)
+	tw.tween_property(l, "outline_modulate:a", 0.0, 0.4).set_delay(1.1)
+	tw.chain().tween_callback(l.queue_free)
 	tw.tween_property(l, "modulate:a", 0.0, 0.9).set_delay(0.3)
 	tw.chain().tween_callback(l.queue_free)
 
@@ -500,14 +493,7 @@ func burst(pos: Vector3, colors: Array, amount: int, speed: float) -> void:
 
 
 func show_message(text: String, duration: float = 0.0) -> void:
-	_message_token += 1
-	var token := _message_token
-	_set_message(text)
-	if duration <= 0.0:
-		return
-	await get_tree().create_timer(duration).timeout
-	if token == _message_token:
-		_set_message(_sticky_message)
+	hud.show_message(text, duration)
 
 
 # --- Setup ------------------------------------------------------------------
@@ -600,103 +586,5 @@ func _setup_camera() -> void:
 
 
 func _setup_hud() -> void:
-	var layer := CanvasLayer.new()
-	add_child(layer)
-
-	var left := _card()
-	left.position = Vector2(20, 14)
-	layer.add_child(left)
-	_hud_level = _label(24)
-	left.add_child(_hud_level)
-
-	# Top-right card: timer, best time, sugar meter, stacked so nothing overlaps.
-	var card := _card()
-	card.anchor_left = 1.0
-	card.anchor_right = 1.0
-	card.offset_left = -300.0
-	card.offset_right = -20.0
-	card.offset_top = 14.0
-	card.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	layer.add_child(card)
-	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 2)
-	card.add_child(col)
-	_hud_time = _label(54)
-	_hud_time.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	col.add_child(_hud_time)
-	_hud_best = _label(22)
-	_hud_best.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	col.add_child(_hud_best)
-	_hud_rush = ProgressBar.new()
-	_hud_rush.show_percentage = false
-	_hud_rush.max_value = 1.0
-	_hud_rush.custom_minimum_size = Vector2(240, 18)
-	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(1, 1, 1, 0.8)
-	bg.set_corner_radius_all(10)
-	bg.border_color = Palette.PINK
-	bg.set_border_width_all(2)
-	var fill := StyleBoxFlat.new()
-	fill.bg_color = Palette.CORAL
-	fill.set_corner_radius_all(10)
-	_hud_rush.add_theme_stylebox_override("background", bg)
-	_hud_rush.add_theme_stylebox_override("fill", fill)
-	col.add_child(_hud_rush)
-	_hud_rush_label = _label(18)
-	_hud_rush_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	col.add_child(_hud_rush_label)
-
-	_hud_message = RichTextLabel.new()
-	_hud_message.bbcode_enabled = true
-	_hud_message.fit_content = true
-	_hud_message.scroll_active = false
-	_hud_message.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_hud_message.anchor_right = 1.0
-	_hud_message.offset_left = 40.0
-	_hud_message.offset_right = -40.0
-	_hud_message.offset_top = 110.0
-	CandyText.style(_hud_message, 52)
-	layer.add_child(_hud_message)
-
-	_hud_board = _label(26)
-	_hud_board.anchor_left = 0.5
-	_hud_board.anchor_right = 0.5
-	_hud_board.offset_left = -140.0
-	_hud_board.offset_right = 140.0
-	_hud_board.offset_top = 290.0
-	layer.add_child(_hud_board)
-
-
-## Rounded cream card behind HUD text, like the menu buttons.
-func _card() -> PanelContainer:
-	var p := PanelContainer.new()
-	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(1.0, 0.96, 0.88, 0.72)
-	sb.border_color = Color(Palette.PINK, 0.9)
-	sb.set_border_width_all(3)
-	sb.set_corner_radius_all(22)
-	sb.content_margin_left = 18
-	sb.content_margin_right = 18
-	sb.content_margin_top = 8
-	sb.content_margin_bottom = 10
-	p.add_theme_stylebox_override("panel", sb)
-	return p
-
-
-func _label(font_size: int) -> Label:
-	var l := Label.new()
-	CandyText.style(l, font_size)
-	return l
-
-
-## Big centre message: first line in candy letters, the rest in chocolate.
-func _set_message(text: String) -> void:
-	if text == "":
-		_hud_message.text = ""
-		return
-	var lines := text.split("\n")
-	var out := "[center]" + CandyText.rainbow(lines[0])
-	if lines.size() > 1:
-		out += "\n[font_size=30]" + "\n".join(lines.slice(1)) + "[/font_size]"
-	_hud_message.text = out + "[/center]"
+	hud = Hud.new()
+	add_child(hud)
