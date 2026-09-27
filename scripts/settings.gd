@@ -21,6 +21,9 @@ var ghost := true
 ## Phones: "tilt" (gyroscope) or "stick" (drag anywhere).
 var control_mode := "tilt"
 var tilt_sensitivity := 1.0
+## Arcade timer: one countdown for the whole run; each level adds time,
+## leftovers carry over, zero is game over (like the 1984 arcade game).
+var arcade := false
 
 
 func _ready() -> void:
@@ -43,6 +46,7 @@ func _ready() -> void:
 		ghost = cfg.get_value("game", "ghost", ghost)
 		control_mode = cfg.get_value("game", "control_mode", control_mode)
 		tilt_sensitivity = cfg.get_value("game", "tilt_sensitivity", tilt_sensitivity)
+		arcade = cfg.get_value("game", "arcade", arcade)
 	_apply()
 
 
@@ -72,6 +76,7 @@ func save() -> void:
 	cfg.set_value("game", "ghost", ghost)
 	cfg.set_value("game", "control_mode", control_mode)
 	cfg.set_value("game", "tilt_sensitivity", tilt_sensitivity)
+	cfg.set_value("game", "arcade", arcade)
 	cfg.save(PATH)
 
 

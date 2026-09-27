@@ -1,6 +1,6 @@
 extends SceneTree
 ## Screenshots of every level along its route (needs a window, not --headless):
-##   godot --always-on-top -s tests/shots.gd
+##   godot --always-on-top -s tests/shots.gd [-- --quest=res://quests/x.json]
 ## Saves to tests/shots/level<N>_<k>.png
 
 var main: Node3D
@@ -11,13 +11,23 @@ var step := -1
 
 func _initialize() -> void:
 	main = load("res://scenes/main.tscn").instantiate()
+	var routes: Array = []
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--quest="):
+			var q := Quest.load_file(arg.get_slice("=", 1))
+			main.get_script().set("quest", q)
+			for d: Dictionary in q.levels:
+				routes.append(d.get("route", []).size())
 	main.auto_advance = false
 
 	main.save_scores = false
 	main.countdown = false
 	root.add_child(main)
-	for li in main.LEVELS.size():
-		var n: int = main.LEVELS[li].new().route.size()
+	if routes.is_empty():
+		for script: GDScript in main.LEVELS:
+			routes.append(script.new().route.size())
+	for li in routes.size():
+		var n: int = routes[li]
 		for wi in [0, n / 3, 2 * n / 3, n - 1]:
 			queue.append([li, wi])
 	DirAccess.make_dir_recursive_absolute("res://tests/shots")

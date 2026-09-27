@@ -36,11 +36,13 @@ const TOOLS := [
 	["waves", "Waves", "Surface", "Wobbly Marble Madness ripples."],
 	["hill", "Hill", "Surface", "A round bump."],
 	["trench", "Trench", "Surface", "A channel. Neighbouring trench tiles join up."],
+	["ice", "Ice", "Surface", "Slippery ice: hardly any grip, the marble slides on."],
 	["humps", "Humps", "Surface", "Big smooth humps across a lane. Paint a strip; the humps run along its long side."],
 	["goo", "Goo", "Surface", "Sour goo pool, Marble Madness's acid. Rolling in pops the marble."],
 	["clear", "Clear", "Surface", "Remove surface bumps and objects from tiles (keeps the ground)."],
 	["spawn", "Start", "Objects", "Where the marble starts. Only one."],
 	["goal", "Hole", "Objects", "The golf hole. Only one."],
+	["goalpad", "Goal pad", "Objects", "Marble Madness finish: a checkered GOAL pad. Use it instead of the hole."],
 	["checkpoint", "Gate", "Objects", "Checkpoint gate. It spans the track by itself; R turns it."],
 	["bumper", "Bumper", "Objects", "Pop bumper. Fills the Sugar Rush meter."],
 	["booster", "Booster", "Objects", "Speed pad. R turns it."],
@@ -52,6 +54,8 @@ const TOOLS := [
 	["hopper", "Hopper", "Monsters", "Hops back and forth. Drag to set its path."],
 	["ghost", "Ghost", "Monsters", "Floats after the marble when it comes close."],
 	["windmill", "Windmill", "Monsters", "Spinning arm that swats the marble away."],
+	["steelie", "Steelie", "Monsters", "Dark metal marble that rolls after you and shoves you off edges."],
+	["slime", "Slime", "Monsters", "Sour acid blob sliding back and forth. It melts you. Drag to set its path."],
 	["slingshot", "Sling", "Toys", "Pinball slingshot. Kicks the marble back."],
 	["cannon", "Cannon", "Toys", "Shoots the marble. Click again to set where it lands."],
 	["catapult", "Catapult", "Toys", "Flings the marble. Click again to set where it lands."],
@@ -60,14 +64,15 @@ const TOOLS := [
 	["hoop", "Hoop", "Toys", "Ring to jump through."],
 	["spinner", "Spinner", "Toys", "Spinning gate."],
 	["redirect", "Turner", "Toys", "Catches the marble and launches it the way it points."],
+	["pipe", "Pipe", "Toys", "Roll into the funnel, pop out of the spout. Click again to place the spout."],
 	["flipper", "Flipper", "Toys", "Pinball flipper: bats the marble the way it points (R turns)."],
 ]
 const OBJ_CHAR := {spawn = "S", goal = "G", bumper = "B", star = "@", target = "#",
-	waves = "W", hill = "H", trench = "T", goo = "A", humps = "M"}
+	waves = "W", hill = "H", trench = "T", goo = "A", humps = "M", ice = "I"}
 const OBJ_NAMES := {
 	"S": "Start", "G": "Golf hole", "B": "Bumper", ">": "Booster", "<": "Booster", "v": "Booster",
 	"^": "Booster", "C": "Checkpoint", "K": "Checkpoint", "W": "Waves", "H": "Hill", "T": "Trench",
-	"@": "Rollover star", "A": "Sour goo", "M": "Humps", "#": "Drop target", "l": "Lollipop", "t": "Candy tree", "b": "Gummy bear",
+	"@": "Rollover star", "A": "Sour goo", "M": "Humps", "I": "Ice", "#": "Drop target", "l": "Lollipop", "t": "Candy tree", "b": "Gummy bear",
 	"g": "Gumdrop", "%": "Golden cupcake", "h": "Heart candy", "r": "Wrapped candy", "$": "Gem candy",
 }
 const DECOR := [["l", "Lollipop"], ["t", "Candy tree"], ["b", "Gummy bear"], ["g", "Gumdrop"],
@@ -77,8 +82,9 @@ const EXTRA_NAMES := {
 	"enemy": "Sweeper", "stomper": "Stomper", "hopper": "Hopper", "ghost": "Ghost", "windmill": "Windmill",
 	"slingshot": "Slingshot", "cannon": "Cannon", "catapult": "Catapult", "loop": "Loop", "chute": "Chute",
 	"hoop": "Hoop", "spinner": "Spinner", "redirect": "Turner", "flipper": "Flipper",
+	"steelie": "Steelie", "slime": "Slime", "pipe": "Pipe", "goalpad": "Goal pad",
 }
-const PAINT_TOOLS := ["road", "paint", "raise", "lower", "ramp", "erase", "waves", "hill", "trench", "goo", "humps", "clear", "decor",
+const PAINT_TOOLS := ["road", "paint", "raise", "lower", "ramp", "erase", "waves", "hill", "trench", "goo", "humps", "ice", "clear", "decor",
 	"bumper", "star", "target", "booster"]
 const MAX_UNDO := 120
 
@@ -667,7 +673,7 @@ func _apply(tile: Vector2i, f: Vector2, shift: bool) -> void:
 				set_tool("paint")
 				ui.toast("Height %d" % tier)
 			return
-		"waves", "hill", "trench", "goo", "humps":
+		"waves", "hill", "trench", "goo", "humps", "ice":
 			for t in _brush_tiles(tile):
 				if is_ground(t.x, t.y):
 					set_o(t.x, t.y, OBJ_CHAR[tool])
@@ -1091,7 +1097,7 @@ func estimate_par() -> float:
 func problems() -> PackedStringArray:
 	var out: PackedStringArray = []
 	var has_s := has_char("S")
-	var has_g := has_char("G")
+	var has_g := has_goal()
 	if not has_s:
 		out.append("No start. Use the Start tool.")
 	if not has_g:
@@ -1101,6 +1107,16 @@ func problems() -> PackedStringArray:
 	if lv.race and not has_g:
 		out.append("Race levels need a hole.")
 	return out
+
+
+## A hole ("G") or a goal pad.
+func has_goal() -> bool:
+	if has_char("G"):
+		return true
+	for e: Dictionary in lv.extras:
+		if e.type == "goalpad":
+			return true
+	return false
 
 
 func has_char(c: String) -> bool:
@@ -1350,7 +1366,7 @@ func guide() -> Array:
 	if not has_char("S"):
 		return ["Start with Sections > Start pad and click on the map, or place a Start with the Start tool.",
 			"Start pad", "start"]
-	if not has_char("G"):
+	if not has_goal():
 		if not track_end().is_empty():
 			return ["Build your track: click pieces in the Pieces tab to add them at the green arrow. End with Finish.",
 				"Add Finish", "finish"]
@@ -1818,7 +1834,7 @@ func _draw_reach() -> void:
 		mi.mesh = im
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_marks.add_child(mi)
-	if has_char("G") and not hole_reachable():
+	if has_goal() and not hole_reachable():
 		var g := gap_tile()
 		if g.x < 0:
 			return
@@ -1885,7 +1901,7 @@ func _update_hover() -> void:
 		for j in range(lo.y, hi.y + 1):
 			for i in range(lo.x, hi.x + 1):
 				tiles.append(Vector2i(i, j))
-	elif tool in ["paint", "raise", "lower", "ramp", "erase", "waves", "hill", "trench", "goo", "humps", "clear"]:
+	elif tool in ["paint", "raise", "lower", "ramp", "erase", "waves", "hill", "trench", "goo", "humps", "ice", "clear"]:
 		tiles = _brush_tiles(_hover)
 	else:
 		tiles = [_hover]

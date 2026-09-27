@@ -387,6 +387,9 @@ func _build_settings(root: Control) -> void:
 		_settings_panel.add_child(_slider("Tilt", (Settings.tilt_sensitivity - 0.5) / 1.5, func(v: float) -> void:
 			Settings.set_value("tilt_sensitivity", 0.5 + v * 1.5)))
 	_settings_panel.add_child(_setting_button(func() -> String:
+		return "Arcade timer: %s" % ("on (one clock for the run)" if Settings.arcade else "off"),
+		func() -> void: Settings.set_value("arcade", not Settings.arcade)))
+	_settings_panel.add_child(_setting_button(func() -> String:
 		return "Best-run ghost: %s" % ("on" if Settings.ghost else "off"),
 		func() -> void: Settings.set_value("ghost", not Settings.ghost)))
 	var reset := _button("Reset best times and unlocks", func() -> void: pass)

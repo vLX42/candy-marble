@@ -37,6 +37,10 @@ const SCENES := {
 	"goo": preload("res://scenes/goo.tscn"),
 	"secret": preload("res://scenes/secret.tscn"),
 	"gate": preload("res://scenes/gate.tscn"),
+	"steelie": preload("res://scenes/steelie.tscn"),
+	"slime": preload("res://scenes/slime.tscn"),
+	"pipe": preload("res://scenes/candy_pipe.tscn"),
+	"goalpad": preload("res://scenes/goal_pad.tscn"),
 	"switch": preload("res://scenes/candy_switch.tscn"),
 }
 ## Sugar Rush: pinball hits fill the meter; full = a few seconds of rush.
@@ -51,6 +55,15 @@ const CAMERA_ROTATION := Vector3(-35.264, 45.0, 0.0)  # true isometric
 const CAMERA_FOLLOW := 5.0
 ## How fast the playfield turns to follow the track (follow camera setting).
 const CAMERA_TURN := 1.6
+## Follow camera: how far ahead it reads the track, and how long the track must
+## point a new way before the view turns.
+const CAMERA_LOOK := 8.0
+const CAMERA_HOLD := 0.5
+## ...and never twice in quick succession.
+const CAMERA_COOLDOWN := 2.5
+## The view only turns once the track heads this far off "up the screen":
+## sideways legs read fine in isometric, only running back down the screen needs a turn.
+const CAMERA_TURN_AT := 100.0
 const NEXT_LEVEL_DELAY := 3.0
 ## Entity dictionary keys that are not node properties.
 const META_KEYS := ["type", "pos", "yaw", "ground_tile", "y", "tint"]
@@ -58,6 +71,7 @@ const META_KEYS := ["type", "pos", "yaw", "ground_tile", "y", "tint"]
 const SPEED_KEYS := {
 	"enemy": ["period", false], "stomper": ["period", false], "hopper": ["period", false],
 	"ghost": ["speed", true], "windmill": ["spin", true],
+	"steelie": ["speed", true], "slime": ["period", false],
 }
 
 ## Set by the title screen before switching to this scene (-1 = use first_level).
@@ -91,6 +105,10 @@ var _ghost_play := PackedVector3Array()
 var _ghost: Node3D
 ## Touch controls (tilt or stick) are driving the input actions.
 var _touch_driving := false
+## Arcade timer (Settings.arcade): seconds left for the whole run.
+var time_left := 0.0
+var time_up := false
+var _bonus_level := -1
 
 var level: LevelBase
 var level_index := 0
@@ -100,6 +118,10 @@ var rival: Rival
 var race_lost := false
 var rival_time := -1.0
 var _route_world: Array[Vector2] = []
+var _cam_progress := 0.0
+var _cam_view := INF
+var _cam_hold := 0.0
+var _cam_cool := 0.0
 var camera: Camera3D
 var sfx: Sfx
 var scores: Scores
@@ -215,6 +237,7 @@ func load_level(data: LevelBase) -> void:
 		ball.position = ground(level.tile_center(test_start.x, test_start.y)) + Vector3.UP * 0.6
 	world.add_child(ball)
 	ball.died.connect(_on_ball_died)
+	ball.silly = level.silly
 	ball.landed.connect(_on_ball_landed)
 	ball.bonked.connect(func(impact: float) -> void:
 		sfx.play("bonk", clampf(-20.0 + impact * 2.5, -20.0, -4.0), 0.12))
@@ -238,15 +261,27 @@ func load_level(data: LevelBase) -> void:
 			node.reached.connect(_on_goal)
 			node.rival_reached.connect(_on_rival_goal)
 
+	_cam_progress = 0.0
+	_cam_view = INF
+	_cam_hold = 0.0
+	_cam_cool = 0.0
 	_cam_yaw = _track_yaw() if Settings.camera_follow else deg_to_rad(45.0)
 	camera.rotation = Vector3(deg_to_rad(CAMERA_ROTATION.x), _cam_yaw, 0.0)
 	camera.global_position = _camera_target()
 	hud.set_level(level_index + 1, level.title, level.time_limit, level.race)
 	_update_best_label()
-	var intro := "%s\nPar %.0f s.  Roll to the hole!" % [level.title, level.time_limit]
+	var intro := "%s\nPar %.0f s.  Roll to the %s!" % [level.title, level.time_limit, "hole" if level.hole else "goal"]
 	if level.race:
 		intro = "%s\nRace the licorice ball to the hole!" % level.title
-	if level.description != "":
+	if Settings.arcade and not test_mode and _bonus_level != level_index:
+		# Each level adds its bonus once; retries don't.
+		_bonus_level = level_index
+		var bonus := snappedf(level.time_limit * 0.8, 5.0)
+		time_left += bonus
+		intro = "%s\n+%.0f seconds.  %.0f s on the clock." % [level.title, bonus, time_left]
+	if level.silly:
+		intro = "%s\nEverything you know is wrong!" % level.title
+	elif level.description != "":
 		var d := level.description.replace("\n", " ")
 		intro = "%s\n%s" % [level.title, d if d.length() <= 90 else d.substr(0, 87) + "..."]
 	show_message(intro, 3.0)
@@ -342,6 +377,10 @@ func _process(delta: float) -> void:
 		total_time += delta
 		level_time += delta
 		_record_ghost()
+		if Settings.arcade and not test_mode:
+			time_left -= delta
+			if time_left <= 0.0:
+				_time_up()
 	_touch_input()
 	_update_ghost()
 	if ball and ball.alive and not finished:
@@ -351,10 +390,13 @@ func _process(delta: float) -> void:
 	var place := "1st" if race_position() == 1 else "2nd"
 	if race_lost:
 		place = "LOST"
-	hud.update(level_time, level_time > level.time_limit, falls, place)
+	if Settings.arcade and not test_mode:
+		hud.update(maxf(time_left, 0.0), time_left < 10.0, falls, place)
+	else:
+		hud.update(level_time, level_time > level.time_limit, falls, place)
 	_update_rush(delta)
 
-	var target_yaw := _track_yaw() if Settings.camera_follow else deg_to_rad(45.0)
+	var target_yaw := _track_yaw(delta) if Settings.camera_follow else deg_to_rad(45.0)
 	if _fly_left > 0.0:
 		target_yaw = deg_to_rad(45.0)
 	_cam_yaw = lerp_angle(_cam_yaw, target_yaw, 1.0 - exp(-CAMERA_TURN * delta))
@@ -381,13 +423,37 @@ func _process(delta: float) -> void:
 
 
 func _restart() -> void:
+	if time_up:
+		# Arcade game over: a fresh run from the first level.
+		time_up = false
+		time_left = 0.0
+		_bonus_level = -1
+		falls = 0
+		total_time = 0.0
+		start_level(0)
+		return
 	if game_complete:
+		time_left = 0.0
+		_bonus_level = -1
 		game_complete = false
 		falls = 0
 		total_time = 0.0
 		start_level(0)
 	else:
 		start_level(level_index)
+
+
+# --- Arcade timer --------------------------------------------------------------
+
+func _time_up() -> void:
+	time_left = 0.0
+	time_up = true
+	finished = true
+	ball.input_lock = 99.0
+	sfx.stop_roll()
+	sfx.play("timeup")
+	hud.show_results({title = "Time's up!", info = "You made it to level %d   Falls %d" % [level_index + 1, falls],
+		hint = "R  start over      Esc  menu"})
 
 
 # --- Touch controls -----------------------------------------------------------
@@ -618,18 +684,71 @@ func _on_rival_goal() -> void:
 
 
 ## Camera yaw that points the track just ahead of the ball up the screen.
-func _track_yaw() -> float:
+func _track_yaw(delta := 0.0) -> float:
 	if _route_world.size() < 2 or ball == null:
 		return _cam_yaw
-	var p := LevelBase.route_progress(_route_world, Vector2(ball.global_position.x, ball.global_position.z))
-	var here := _route_point(p)
-	var ahead := _route_point(p + 1.5)
+	var pos := Vector2(ball.global_position.x, ball.global_position.z)
+	_cam_progress = _local_progress(pos, _cam_progress)
+	# Where the track heads over the next few tiles (by distance, not by
+	# waypoint, so tight zig-zags and dense maze routes average out).
+	var here := _route_point(_cam_progress)
+	var ahead := _route_ahead(_cam_progress, CAMERA_LOOK)
 	var d := ahead - here
-	if d.length() < 0.5:
-		return _cam_yaw
+	if d.length() < 1.0:
+		return _cam_view
 	# Camera forward (-basis.z) along d: the track ahead points up the screen,
-	# so "up" on the stick always means "forward".
-	return atan2(-d.x, -d.y)
+	# so "up" on the stick always means "forward". Snap to the four isometric
+	# views and only turn when the track has clearly swung round for a moment,
+	# so wiggles, bumpers and U-turns don't spin the playfield about.
+	var raw := atan2(-d.x, -d.y)
+	var want := deg_to_rad(45.0) + roundf((raw - deg_to_rad(45.0)) / (PI / 2.0)) * (PI / 2.0)
+	if is_equal_approx(_cam_view, INF):
+		_cam_view = want
+	_cam_cool -= delta
+	if _cam_cool <= 0.0 and absf(angle_difference(want, _cam_view)) > 0.1 and absf(angle_difference(raw, _cam_view)) > deg_to_rad(CAMERA_TURN_AT):
+		_cam_hold += delta
+		if _cam_hold > CAMERA_HOLD:
+			_cam_view = want
+			_cam_hold = 0.0
+			_cam_cool = CAMERA_COOLDOWN
+	else:
+		_cam_hold = 0.0
+	return _cam_view
+
+
+## Route progress near the last one: it only moves on along the next few legs,
+## so a route that doubles back past itself can't make the camera jump across.
+## Falls back to the whole route after a respawn or a big shortcut.
+func _local_progress(pos: Vector2, last: float) -> float:
+	var n := _route_world.size()
+	var best := last
+	var best_d := INF
+	for i in range(clampi(int(last), 0, n - 2), clampi(int(last) + 4, 0, n - 1)):
+		var a := _route_world[i]
+		var b := _route_world[i + 1]
+		var q := Geometry2D.get_closest_point_to_segment(pos, a, b)
+		var dd := q.distance_to(pos)
+		if dd < best_d - 0.01:
+			best_d = dd
+			best = maxf(last, i + a.distance_to(q) / maxf(a.distance_to(b), 0.001))
+	if best_d > 6.0:
+		best = LevelBase.route_progress(_route_world, pos)
+	return best
+
+
+## The route point `dist` world units further on from `progress`.
+func _route_ahead(progress: float, dist: float) -> Vector2:
+	var i := clampi(int(progress), 0, _route_world.size() - 2)
+	var p := _route_point(progress)
+	while i < _route_world.size() - 1:
+		var nxt := _route_world[i + 1]
+		var seg := p.distance_to(nxt)
+		if seg >= dist:
+			return p.move_toward(nxt, dist)
+		dist -= seg
+		p = nxt
+		i += 1
+	return p
 
 
 func _route_point(progress: float) -> Vector2:
@@ -735,7 +854,7 @@ func _on_goal() -> void:
 	_update_best_label()
 	var medal := medal_for(level_time, level.time_limit)
 	var res := {
-		title = "You win the race!" if rival else "In the hole!",
+		title = "You win the race!" if rival else "In the hole!" if level.hole else "GOAL!",
 		time = level_time, medal = medal,
 		badge = "NEW BEST!" if rank == 0 else ("#%d ON THE BOARD" % (rank + 1) if rank > 0 else ""),
 		info = "Par %.0f s   Falls %d" % [level.time_limit, level_falls],
@@ -744,6 +863,8 @@ func _on_goal() -> void:
 		confetti = rank == 0 or medal == "GOLD",
 		next = level_index < level_count() - 1 and not test_mode,
 	}
+	if Settings.arcade and not test_mode:
+		res.info += "   Time left %.0f s" % time_left
 	if test_mode:
 		res.hint = "R  retry      Esc  back to the editor"
 		hud.show_results(res)

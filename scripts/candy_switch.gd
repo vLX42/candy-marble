@@ -30,7 +30,7 @@ func _process(delta: float) -> void:
 
 
 func _on_body_entered(body: Node3D) -> void:
-	if not (body is Ball) or body is Rival or _cool > 0.0:
+	if not (body is Ball) or body is Rival or body is Steelie or _cool > 0.0:
 		return
 	_cool = 1.0
 	get_tree().call_group("gate_" + channel, "trigger", open_time)

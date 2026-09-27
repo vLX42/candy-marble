@@ -15,7 +15,7 @@ const MAX_SIZE := 160
 const MAX_EXTRAS := 400
 const MAX_ROUTE := 400
 const HEIGHT_CHARS := ".0123456789ewsn"
-const OBJECT_CHARS := ".SGBHWT><v^xXzZ-|CKltbg%hr$@#AM"
+const OBJECT_CHARS := ".SGBHWT><v^xXzZ-|CKltbg%hr$@#AMI"
 
 ## Extras and their tweakable numbers: {param: [default, min, max, label]}.
 ## "travel" (Vector3) and "target_tile" (Vector2) are handled on their own.
@@ -40,13 +40,18 @@ const EXTRA_PARAMS := {
 	"gate": {open_time = [0.0, 0.0, 60.0, "Open seconds (0 = for good)"], height = [1.3, 0.5, 3.0, "Height"],
 		y = [0.0, -2.0, 9.0, "Height of a bridge"]},
 	"secret": {},
+	"steelie": {speed = [4.2, 1.5, 9.0, "Roll speed"], sense = [9.0, 3.0, 20.0, "Sight range"],
+		leash = [10.0, 3.0, 30.0, "Leash length"]},
+	"slime": {period = [5.0, 1.0, 20.0, "Trip time (s)"], phase = [0.0, 0.0, 1.0, "Start offset"]},
+	"pipe": {speed = [6.0, 2.0, 14.0, "Exit speed"]},
+	"goalpad": {},
 	"loop": {},
 	"chute": {y = [0.0, -2.0, 6.0, "Height"]},
 }
 ## Extras that move and can be recoloured and sped up.
-const MONSTERS := ["enemy", "stomper", "hopper", "ghost", "windmill"]
-const HAS_TRAVEL := ["enemy", "hopper"]
-const HAS_TARGET := ["catapult", "cannon"]
+const MONSTERS := ["enemy", "stomper", "hopper", "ghost", "windmill", "steelie", "slime"]
+const HAS_TRAVEL := ["enemy", "hopper", "slime"]
+const HAS_TARGET := ["catapult", "cannon", "pipe"]
 
 const THEMES := {
 	"Candy": {tiers = ["#A8E6C8", "#C9B8EC", "#BFE3F7", "#F9C6D3", "#FFE7B3"], ramp = "#F6E27A", wall = "#5A3426"},
@@ -86,6 +91,7 @@ static func from_dict(d: Dictionary) -> CustomLevel:
 	l.description = s.description
 	l.time_limit = s.par
 	l.race = s.race
+	l.silly = s.silly
 	l.heights = PackedStringArray(s.heights)
 	l.objects = PackedStringArray(s.objects)
 	var tiers: Array[Color] = []
@@ -142,6 +148,7 @@ static func sanitize(d: Variant) -> Dictionary:
 	out.description = _text(src.get("description"), "", 400)
 	out.par = clampf(_num(src.get("par"), 30.0), 5.0, 900.0)
 	out.race = src.get("race") is bool and src.race
+	out.silly = src.get("silly") is bool and src.silly
 	out.monster_speed = clampf(_num(src.get("monster_speed"), 1.0), 0.25, 3.0)
 	out.rival_speed = clampf(_num(src.get("rival_speed"), 1.0), 0.5, 1.6)
 	out.break_drop = clampi(int(_num(src.get("break_drop"), 0)), 0, 18)

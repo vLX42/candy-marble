@@ -24,6 +24,7 @@ extends RefCounted
 ##   g gumdrop  % golden cupcake  h heart candy  r wrapped candy  $ gem candy (floating decor)
 ##   @ rollover star  # drop target   A sour goo pool (pops the marble)
 ##   M humps: big smooth humps across a run of M tiles (Marble Madness bridges)
+##   I ice: slippery, hardly any grip
 ## extras: loop, cannon {target_tile}, slingshot, hoop {height}, spinner, redirect
 
 const TILE := 2.0
@@ -61,6 +62,11 @@ var rival_speed := 1.0
 var rival_tint := Color(0, 0, 0, 0)
 ## Marble breaks on drops of more than this many steps (0 = never).
 var break_drop := 0
+## Silly Race: slopes push the marble UP and monsters are harmless (squishable).
+var silly := false
+## False when the finish is a GOAL pad instead of the golf hole (no hole cut).
+var hole := true
+var _ice := {}                   # Vector2i tile -> true
 ## Height of one step (tier) in world units. Taller steps = taller cliffs.
 var step := TIER
 
@@ -97,6 +103,9 @@ func build() -> void:
 			d.kind = d.type
 			d.type = "pinball"
 		entities.append(d)
+		if d.type == "goalpad" and goal == Vector2.INF:
+			goal = d.pos
+			hole = false
 
 
 # --- tiles --------------------------------------------------------------------
@@ -219,7 +228,7 @@ func feature(x: float, z: float) -> float:
 		h += _wave(x, z)
 	if not _humps.is_empty():
 		h += _hump(x, z)
-	if goal != Vector2.INF:
+	if goal != Vector2.INF and hole:
 		var dg := p.distance_to(goal)
 		if dg < 2.8:
 			h -= 0.3 * (1.0 - smoothstep(HOLE_RADIUS, 2.8, dg))
@@ -294,12 +303,18 @@ func _hump(x: float, z: float) -> float:
 
 
 func in_hole(x: float, z: float) -> bool:
-	return goal != Vector2.INF and Vector2(x, z).distance_to(goal) < HOLE_RADIUS
+	return hole and goal != Vector2.INF and Vector2(x, z).distance_to(goal) < HOLE_RADIUS
+
+
+func is_ice(x: float, z: float) -> bool:
+	return _ice.has(tile_at(x, z))
 
 
 ## Linear-space colour for a surface cell.
 func cell_color(i: int, j: int, x: float, z: float) -> Color:
 	var c: Color
+	if _ice.has(Vector2i(i, j)):
+		return Color("#CFF4FF").srgb_to_linear()
 	if is_ramp(i, j):
 		c = ramp_color
 	else:
@@ -347,6 +362,8 @@ func _parse_object(c: String, i: int, j: int) -> void:
 			entities.append({type = "pinball", pos = p, kind = "rollover"})
 		"A":
 			entities.append({type = "goo", pos = p})
+		"I":
+			_ice[Vector2i(i, j)] = true
 		"#":
 			entities.append({type = "pinball", pos = p, kind = "target"})
 		"l", "t", "b", "g", "%", "h", "r", "$":

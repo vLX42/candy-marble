@@ -18,6 +18,8 @@ var was_alive := true
 var results: Array[String] = []
 var failed := false
 var chute_frames := 0
+var cam_turn := 0.0
+var cam_last := 0.0
 
 
 func _initialize() -> void:
@@ -48,12 +50,17 @@ func _initialize() -> void:
 		for i in count:
 			levels.append(i)
 	main.first_level = levels[0]
+	if "--cam" in OS.get_cmdline_user_args():
+		root.get_node("Settings").camera_follow = true
 	root.add_child(main)
+	cam_last = main._cam_yaw
 
 
 func _process(delta: float) -> bool:
 	level_t += delta
 	var ball: Ball = main.ball
+	cam_turn += absf(angle_difference(main._cam_yaw, cam_last))
+	cam_last = main._cam_yaw
 	if "--trace" in OS.get_cmdline_user_args() and int(level_t * 120) % 15 == 0 and ball.alive:
 		var q := ball.global_position / LevelBase.TILE
 		print("  trace t=%.2f tile=(%.1f, %.1f) y=%.2f wp=%d v=%s" % [level_t, q.x, q.z, ball.global_position.y, wp, ball.linear_velocity.snapped(Vector3.ONE * 0.1)])
@@ -220,6 +227,8 @@ func _report(ok: bool) -> void:
 		"PASS" if ok else "FAIL", main.level_index + 1, lvl.title, level_t, lvl.time_limit, main.falls]
 	if "--chute" in OS.get_cmdline_user_args():
 		line += "  | frames riding a chute: %d" % chute_frames
+	if "--cam" in OS.get_cmdline_user_args():
+		line += "  | camera turned %.0f deg" % rad_to_deg(cam_turn)
 	if main.rival:
 		line += "  | rival %s" % ("%.1f s" % main.rival_time if main.rival_time > 0 else "beaten, was at waypoint %d/%d" % [main.rival._wp, main.rival._route.size()])
 	if ok and level_t > lvl.time_limit:
@@ -240,4 +249,6 @@ func _report(ok: bool) -> void:
 	main.start_level(levels[li])
 	wp = 0
 	level_t = 0.0
+	cam_turn = 0.0
+	cam_last = main._cam_yaw
 	was_alive = true

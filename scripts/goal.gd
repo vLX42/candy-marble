@@ -40,6 +40,8 @@ func _ready() -> void:
 
 
 func _on_body_entered(body: Node3D) -> void:
+	if body is Steelie:
+		return
 	if body is Rival:
 		if not body.finished:
 			body.finished = true

@@ -30,6 +30,8 @@ func _build_placeholder() -> void:
 
 
 func _on_body_entered(body: Node3D) -> void:
+	if body is Steelie:
+		return
 	if body is Rival:
 		body.spawn_point = global_position + Vector3.UP * 0.6 + global_basis.x * 1.2
 		return

@@ -41,6 +41,10 @@ var _air_top := -INF
 var _prev_vel := Vector3.ZERO
 ## How the last death happened ("melt" for sour goo), for the effects.
 var death_cause := ""
+## Silly Race: monsters can't hurt this marble (they get squished instead).
+var silly := false
+var _level: LevelBase
+var _on_ice := false
 var _melting := false
 var _knock_cool := 0.0
 
@@ -89,6 +93,7 @@ func _physics_process(_delta: float) -> void:
 
 	_check_landing()
 	_check_impacts(_delta)
+	_surface_rules()
 	if _flying and input_lock <= 0.0 and get_contact_count() > 0:
 		_flying = false
 		if _land_speed > 0.0:
@@ -105,7 +110,7 @@ func _physics_process(_delta: float) -> void:
 		return
 	var flat_vel := Vector3(linear_velocity.x, 0.0, linear_velocity.z)
 	if flat_vel.dot(dir) < max_speed:
-		var control := 1.0 if is_grounded() else air_control
+		var control := (0.3 if _on_ice else 1.0) if is_grounded() else air_control
 		apply_central_force(dir * push_force * control)
 
 
@@ -172,6 +177,29 @@ func _screen_to_world(input: Vector2) -> Vector3:
 	var right := Vector3(cam_basis.x.x, 0.0, cam_basis.x.z).normalized()
 	var back := Vector3(cam_basis.z.x, 0.0, cam_basis.z.z).normalized()
 	return (right * input.x + back * input.y).limit_length(1.0)
+
+
+## Ice and Silly Race slopes, read from the level under the marble.
+func _surface_rules() -> void:
+	if _level == null:
+		var game := get_tree().get_first_node_in_group("game")
+		_level = game.get("level") if game else null
+		if _level == null:
+			return
+	var p := global_position
+	var ice := is_grounded() and _level.is_ice(p.x, p.z)
+	if ice != _on_ice:
+		_on_ice = ice
+		(physics_material_override as PhysicsMaterial).friction = 0.04 if ice else 0.9
+		linear_damp = 0.0 if ice else 0.05
+	if _level.silly and is_grounded():
+		# Slopes push uphill: three times the downhill pull the other way, so
+		# the marble climbs about twice as hard as it would normally fall.
+		var e := 0.3
+		var gx := (_level.height(p.x + e, p.z) - _level.height(p.x - e, p.z)) / (2.0 * e)
+		var gz := (_level.height(p.x, p.z + e) - _level.height(p.x, p.z - e)) / (2.0 * e)
+		var g := float(ProjectSettings.get_setting("physics/3d/default_gravity"))
+		apply_central_force(Vector3(gx, 0.0, gz).limit_length(1.2) * g * mass * 3.0)
 
 
 func _check_impacts(delta: float) -> void:
@@ -348,7 +376,8 @@ func melt() -> void:
 	tw.tween_property(model, "position", down, 1.0).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tw.tween_property(goo, "scale", squash, 1.0).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tw.tween_property(goo, "position", down, 1.0).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	await tw.finished
+	# A timer, not tw.finished: a killed tween must never leave the marble stuck.
+	await get_tree().create_timer(1.0, false).timeout
 	goo.queue_free()
 	bubbles.queue_free()
 	death_cause = "melt"

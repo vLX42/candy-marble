@@ -11,9 +11,13 @@ par. Best level times and best full runs are saved locally.
 
 - **Title screen** with Play / Continue, level select (best times, medals)
   and settings. Levels unlock one by one as you finish them.
-- **Settings**: camera follows the track (default, the playfield turns so the
-  way ahead points up the screen) or fixed isometric, zoom, music and effects
-  volume, graphics high/fast, fullscreen, reset progress.
+- **Settings**: camera follows the track (default: it snaps between the four
+  isometric views and only turns when the track runs back down the screen) or
+  fixed isometric, zoom, music and effects volume, graphics high/fast,
+  fullscreen, **Arcade timer**, reset progress.
+- **Arcade timer** (off by default): like the 1984 cabinet, every level adds
+  time to one clock and leftover seconds carry over. Run out and it's
+  "Time's up!", R starts over from level 1.
 - **Races**: on some levels the evil licorice ball races you to the hole. It
   uses boosters, loops and cannons too, and you can bump each other around.
   Win the race to clear the level.
@@ -130,12 +134,24 @@ Sharing and installing:
 
 Marble Madness touches in the Level tab: **Step height** (taller cliffs) and
 **Hard landings** (the marble breaks on drops over N steps). Surface tools
-include **Goo** (sour pools that pop the marble) and **Humps** (big smooth humps
-across a lane).
+include **Goo** (sour pools that melt the marble), **Humps** (big smooth humps
+across a lane) and **Ice** (almost no grip, hard to steer).
+
+Pieces from the original arcade game:
+- **Steelie** (Monsters): a heavy black marble that chases you near its home
+  and shoves you off ledges.
+- **Acid slime** (Monsters): a green blob sliding back and forth that melts
+  the marble.
+- **Pipe** (Toys): swallows the marble and spits it out at its target.
+- **GOAL pad** (Objects): a raised checkered finish with flags instead of the
+  hole.
+- **Silly level** (Level tab): everything you know is wrong. Slopes roll you
+  *up* and you squish the munchers instead of popping.
 
 The shipped **Marble Madness** quest (`quests/marble_madness.json`, built by
-`tools/make_madness_quest.py`) has five multi-level courses: Spiral Summit,
-Terrace Falls, Goo Gorge, Sky Catwalks and Ultimate Madness (a race).
+`tools/make_madness_quest.py`) has six races, each ending on a GOAL pad:
+Spiral Summit, Terrace Falls (steelie, slime, pipe), Goo Gorge (acid alley),
+Sky Catwalks (ice), Silly Race and Ultimate Madness (a race over ice and slime).
 `tools/preview_quest.gd` renders a 3D overview of every level in a quest.
 
 Shared files are data only: every field is checked and clamped
@@ -200,10 +216,12 @@ godot --headless --fixed-fps 120 -s tests/editor_test.gd   # editor tools, undo,
 godot --headless --fixed-fps 120 -s tests/sections_test.gd # sections, Road join-ups, guide steps
 godot --headless --fixed-fps 120 -s tests/madness_test.gd  # hard landings, goo, humps, tall steps
 godot --headless --fixed-fps 120 -s tests/flow_test.gd     # countdown, pause, ghost replay, test from here
+godot --headless --fixed-fps 120 -s tests/original_test.gd # pipe, ice, slime, steelie, GOAL pad, silly, arcade clock
 godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/marble_madness.json
+godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --cam     # how much the follow camera turns
 godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --remix   # built-in levels after a trip through the quest format
 godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/sweet_starter.json
-godot --always-on-top -s tests/shots.gd                   # screenshots to tests/shots/
+godot --always-on-top -s tests/shots.gd                   # screenshots to tests/shots/ (-- --quest=... too)
 godot --always-on-top -s tests/editor_shots.gd            # editor and quest page screenshots
 godot --always-on-top -s tests/perf.gd -- --level=4       # fps, triangles, draw calls
 ```

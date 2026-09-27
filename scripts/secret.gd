@@ -39,7 +39,7 @@ func _process(delta: float) -> void:
 
 
 func _on_body_entered(body: Node3D) -> void:
-	if _found or not (body is Ball) or body is Rival:
+	if _found or not (body is Ball) or body is Rival or body is Steelie:
 		return
 	_found = true
 	get_tree().call_group("game", "cheer", "SECRET!", global_position + Vector3.UP * 2.0)

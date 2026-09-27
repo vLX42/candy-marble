@@ -1,4 +1,4 @@
-"""Writes quests/marble_madness.json: five multi-level courses in the spirit of
+"""Writes quests/marble_madness.json: six multi-level races in the spirit of
 Marble Madness's races, built in the level editor's quest format (open it with
 Quests > Edit to change anything).
 Run: python3 tools/make_madness_quest.py
@@ -138,13 +138,13 @@ def spiral_summit():
     s5 = [c for c in centers if c[2] == 5 and c[3] is None]
     m.put(s5[0][4] + 1, s5[0][5] + 1, "C")
     end = centers[-1]
-    m.put(end[4] + 2, end[5] + 1, "G")
+    m.extra(type="goalpad", tile=(end[4] + 1.5, end[5] + 1.5))
     # Candy on the summit.
     m.put(centers[0][4], centers[0][5], "l")
     m.put(centers[0][4] + 3, centers[0][5] + 3, "%")
     for (cx, cz, side, ramp_h, x0, z0) in centers:
         m.way((cx, cz))
-    m.way((end[4] + 2, end[5] + 1))
+    m.way((end[4] + 2, end[5] + 2))
     return m.level("Spiral Summit",
                    "Wind down the candy mountain. No rails, and a fall onto the lap below breaks you!",
                    62, "Mint choc", break_drop=2, step=1.0)
@@ -170,16 +170,19 @@ def terrace_falls():
     m.extra(type="hopper", tile=(16, 32), travel=[0, 0, -10], period=3.0, hops=3, phase=0.5, tint="#6fd13a")
     m.extra(type="enemy", tile=(22, 19), travel=[0, 0, 22], period=5.0, tint="#6fd13a")
     m.put(21, 22, "K")
+    m.extra(type="steelie", tile=(15, 27), speed=3.6, sense=7.0, leash=8.0)
+    m.extra(type="slime", tile=(4, 26), travel=[10.0, 0.0, 0.0], period=4.5)
+    m.extra(type="pipe", tile=(3.5, 31), target_tile=(20, 31.5), speed=5.0)
     # Diagonal stair terraces, one step at a time, down to the flag.
     for z in range(18, 33):
         for x in range(23, 35):
             m.hts[z][x] = str(max(0, 2 - ((x - 23) + (z - 18)) // 5))
-    m.put(31, 25, "G")
+    m.extra(type="goalpad", tile=(31, 25.5))
     m.put(33, 23, "%")
     m.put(33, 27, "g")
-    m.way((3.5, 3.5), (3.5, 6), (3.5, 17.5), (4, 20), (7, 22.5), (15, 23.5), (21, 23.5), (25, 25), (31, 25))
+    m.way((3.5, 3.5), (3.5, 6), (3.5, 17.5), (4, 20), (7, 22.5), (15, 23.5), (21, 23.5), (25, 25), (31, 26))
     return m.level("Terrace Falls",
-                   "Down the long ramp, past pyramids and green slinkies, then hop down the terraces.",
+                   "Dodge the steelie and the acid slime, then hop down the terraces.",
                    26, "Candy", break_drop=2, step=1.0, monster_tint="#6fd13a")
 
 
@@ -209,7 +212,7 @@ def goo_gorge():
     m.fill(8, 15, 29, 16, 5)               # lane B, back the other way
     m.fill(26, 15, 29, 18, 5)              # landing pad at the foot of the ramp
     m.put(26, 15, "C")
-    m.extra(type="ghost", tile=(26.5, 18), speed=2.0, leash=2.0, sense=4.5, tint="#2b2438")
+    m.extra(type="steelie", tile=(27, 18), speed=3.4, sense=5.0, leash=3.0)
     m.extra(type="stomper", tile=(13.5, 15.5), period=2.6)
     m.fill(8, 17, 9, 22, "n")              # ramp down three more
     m.fill(8, 23, 31, 24, 2)               # lane C, wavy
@@ -217,17 +220,19 @@ def goo_gorge():
     for x in range(12, 19):
         m.put(x, 23, "W")
         m.put(x, 24, "W")
-    m.extra(type="ghost", tile=(6.5, 26), speed=2.0, leash=2.0, sense=4.5, tint="#2b2438")
+    m.fill(20, 21, 28, 26, 2)              # acid alley: slimes patrol the edges
+    m.extra(type="slime", tile=(20, 21), travel=[8.0, 0.0, 0.0], period=4.0)
+    m.extra(type="slime", tile=(28, 26), travel=[-8.0, 0.0, 0.0], period=4.0, phase=0.5)
     m.fill(30, 20, 36, 27, 2)              # flag mesa
     m.fill(37, 20, 37, 27, 3)
     m.fill(30, 19, 37, 19, 3)
     m.fill(30, 28, 37, 28, 3)
-    m.put(34, 23, "G")
+    m.extra(type="goalpad", tile=(34, 23.5))
     m.put(36, 21, "t")
     m.put(36, 26, "b")
     m.way((3, 3), (5, 3.5), (8, 3.5), (17, 3.5), (18.5, 3.5), (18.5, 5.5), (18.5, 7.5), (20, 7.5), (21, 8), (23.5, 8),
           (24.5, 7), (27, 7), (28.5, 7.5), (28.5, 9), (28.5, 14), (28, 16.5), (26, 16), (24, 15.5), (10, 15.5), (8.5, 15.5), (8.5, 17),
-          (8.5, 22), (8.5, 24.5), (10.5, 24), (12, 23.5), (30, 23.5), (34, 23))
+          (8.5, 22), (8.5, 24.5), (10.5, 24), (12, 23.5), (30, 23.5), (34, 24))
     return m.level("Goo Gorge",
                    "Narrow lanes down a sour gorge. Roll the humps, dodge the goo and the steelies.",
                    44, "Caramel", break_drop=2, step=1.0)
@@ -246,6 +251,9 @@ def sky_catwalks():
     m.fill(17, 1, 20, 4, 9)                # windmill pad
     m.extra(type="windmill", tile=(18.5, 2.5), spin=1.1, arm_length=2.2, tint="#8cc9f0")
     m.fill(21, 2, 27, 2, 9)                # balance beam, one tile wide
+    m.fill(5, 1, 16, 1, 9)                 # ice lane beside the catwalk
+    for x in range(5, 17):
+        m.put(x, 1, "I")
     m.fill(28, 1, 31, 5, 8)                # step down
     m.fill(29, 6, 30, 14, 8)               # catwalk down
     m.extra(type="stomper", tile=(29.5, 9.5), period=2.8)
@@ -256,24 +264,58 @@ def sky_catwalks():
     m.fill(25, 16, 26, 17, "w")            # kicker into the void
     m.fill(13, 14, 22, 19, 6)              # landing pad across the gap
     m.put(16, 16, "K")
+    m.extra(type="steelie", tile=(15, 18), speed=3.4, sense=5.0, leash=3.0)
+    for x in range(13, 23):
+        m.put(x, 14, "I")
+        m.put(x, 19, "I")
     m.fill(5, 16, 12, 17, 6)               # goo catwalk
     m.put(10, 16, "A")
     m.put(7, 17, "A")
     m.fill(1, 14, 4, 19, 6)                # cannon pad
     m.extra(type="cannon", tile=(2.5, 18), target_tile=(2.5, 24.5))
     m.fill(0, 22, 5, 27, 2)                # flag island far below
-    m.put(3, 25, "G")
+    m.extra(type="goalpad", tile=(3, 24.5))
     m.put(0, 27, "%")
     m.put(5, 22, "l")
     m.way((2, 2), (4, 2.5), (16, 2.5), (18.5, 1.5), (21, 2), (27, 2), (29.5, 3), (29.5, 5), (29.5, 14),
           (29.5, 16.5), (28, 16.5), (25.5, 16.5), (19, 16.5), (13, 16.5), (12, 17), (9.5, 17), (8.5, 16), (6, 16),
           (4.5, 16.5), (2.5, 15.5), (2.5, 18), (2.5, 24.5), (3, 25))
     return m.level("Sky Catwalks",
-                   "Skinny catwalks in the sky: the beam, the hammers, the jump, then the cannon.",
+                   "Skinny catwalks: the beam, the hammers, a jump, then the cannon.",
                    38, "Blueberry", break_drop=4, step=1.0)
 
 
-# --- 5. Ultimate Madness ----------------------------------------------------------------
+# --- 5. Silly Race ----------------------------------------------------------------------
+
+def silly_race():
+    """Everything you know is wrong: slopes roll the marble UP, and the munchers
+    that pop you everywhere else get squished flat here."""
+    m = Map(34, 20)
+    m.fill(1, 6, 6, 13, 1)                 # start in the valley
+    m.put(3, 9, "S")
+    m.put(1, 6, "l")
+    m.fill(7, 7, 10, 12, "w")              # ramp up (rises towards +x)
+    m.fill(11, 5, 18, 14, 3)               # first terrace: squish the munchers
+    m.extra(type="enemy", tile=(14, 6), travel=[0.0, 0.0, 14.0], period=3.0)
+    m.extra(type="hopper", tile=(16, 13), travel=[0.0, 0.0, -12.0], period=3.4, hops=3, tint="#6fd13a")
+    for x in range(12, 18):
+        m.put(x, 5, "M")
+        m.put(x, 14, "M")
+    m.fill(19, 8, 22, 11, "w")             # second ramp up
+    m.fill(23, 4, 32, 15, 6)               # the summit with the GOAL
+    m.put(24, 5, "K")
+    m.extra(type="enemy", tile=(26, 5), travel=[0.0, 0.0, 16.0], period=2.6, phase=0.5)
+    m.extra(type="slime", tile=(28, 13), travel=[0.0, 0.0, -8.0], period=4.0)
+    m.extra(type="goalpad", tile=(30, 9.5))
+    m.put(32, 4, "%")
+    m.put(32, 15, "g")
+    m.way((3, 9.5), (6, 9.5), (10.5, 9.5), (14, 9.5), (18.5, 9.5), (22.5, 9.5), (26, 9.5), (30, 10))
+    return m.level("Silly Race",
+                   "Everything you know is wrong! Slopes roll you uphill and you squish the munchers.",
+                   16, "Bubblegum", break_drop=3, step=1.0, silly=True)
+
+
+# --- 6. Ultimate Madness ----------------------------------------------------------------
 
 def ultimate_madness():
     """Race the licorice steelie down wave terraces, over a hump bridge across
@@ -293,8 +335,11 @@ def ultimate_madness():
                     m.put(x, z, "W")
     for x, z in [(20, 10), (22, 14), (20, 17)]:
         m.put(x, z, "B")
-    m.put(15, 10, "A")
-    m.put(16, 16, "A")
+    m.extra(type="slime", tile=(16, 9), travel=[0.0, 0.0, 9.0], period=3.6)
+    for x in range(19, 24):
+        for z in range(8, 20):
+            if (x, z) not in [(20, 10), (22, 14), (20, 17)]:
+                m.put(x, z, "I")
     m.put(26, 12, "K")
     m.extra(type="hopper", tile=(27, 8), travel=[0, 0, 22], period=8.0, hops=4, tint="#6fd13a")
     m.fill(29, 5, 36, 22, 1)               # goo moat far below
@@ -313,25 +358,25 @@ def ultimate_madness():
     m.fill(37, 8, 44, 8, 6)
     m.fill(37, 19, 44, 19, 6)
     m.fill(45, 8, 45, 19, 6)
-    m.extra(type="stomper", tile=(40.5, 13.5), period=2.4)
-    m.put(43, 13, "G")
+    m.extra(type="steelie", tile=(40, 10), speed=3.6, sense=5.0, leash=3.0)
+    m.extra(type="goalpad", tile=(43, 13.5))
     m.put(44, 10, "%")
     m.put(44, 17, "g")
-    m.way((3, 12), (8, 13.5), (18, 13.5), (23, 12), (28, 13.5), (36.5, 13.5), (38.5, 11), (42, 11), (43, 13))
+    m.way((3, 12), (8, 13.5), (18, 13.5), (23, 12), (28, 13.5), (36.5, 13.5), (38.5, 13.5), (43, 14))
     return m.level("Ultimate Madness",
-                   "Final race! Beat the licorice steelie down the waves and over the hump bridge.",
+                   "Final race! Beat the rival over ice, slime and the hump bridge.",
                    26, "Candy", break_drop=2, step=1.0, race=True, rival_tint="#2b2438", rival_speed=0.92)
 
 
-LEVELS = [spiral_summit, terrace_falls, goo_gorge, sky_catwalks, ultimate_madness]
+LEVELS = [spiral_summit, terrace_falls, goo_gorge, sky_catwalks, silly_race, ultimate_madness]
 
 if __name__ == "__main__":
     quest = {
         "format": "candy-quest", "version": 1, "id": "sample_marble_madness",
         "name": "Marble Madness", "author": "Candy Marble",
-        "description": "Five tall, twisty courses in the spirit of the 1984 arcade classic: spirals, terraces, goo, catwalks and a race to the bottom. Big drops break the marble!",
+        "description": "Six races in the spirit of the 1984 arcade classic: steelies, acid slime, pipes, ice, a Silly Race and a checkered GOAL at the end of each. Big drops break the marble!",
         # Bump "updated" when the levels change: untouched installed copies update.
-        "created": 0, "updated": 2,
+        "created": 0, "updated": 3,
         "levels": [f() for f in LEVELS],
     }
     os.makedirs(os.path.dirname(OUT), exist_ok=True)

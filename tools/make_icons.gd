@@ -160,6 +160,11 @@ func _initialize() -> void:
 		spinner = [["0"], [], [{type = "spinner", tile = [0, 0], yaw = 45.0}], 2.6],
 		redirect = [["0"], [], [{type = "redirect", tile = [0, 0], yaw = 90.0}], 2.8],
 		flipper = [["00"], [], [{type = "flipper", tile = [0.5, 0], yaw = 0.0}], 3.2],
+		ice = [["000", "000", "000"], ["III", "III", "III"], [], 7.0],
+		steelie = [["0"], [], [{type = "steelie", tile = [0, 0]}], 2.6],
+		slime = [["0"], [], [{type = "slime", tile = [0, 0], travel = [0, 0, 0]}], 2.8],
+		pipe = [["00"], [], [{type = "pipe", tile = [0, 0], target_tile = [0, 0.4]}], 3.4],
+		goalpad = [["000", "000"], [], [{type = "goalpad", tile = [1, 0.5]}], 7.5],
 	}
 	for id: String in tiles:
 		jobs.append(["tile", id, tiles[id]])

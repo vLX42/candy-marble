@@ -142,3 +142,18 @@ static func ghostify(node: Node, alpha: float) -> void:
 			d.albedo_color.a = alpha
 			d.clearcoat_enabled = false
 			mi.set_surface_override_material(s, d)
+
+
+## Silly Race: a monster gets squashed flat, cheers "SQUISH!" and is gone.
+static func squish(node: Node3D) -> void:
+	if node.has_meta("squished"):
+		return
+	node.set_meta("squished", true)
+	node.get_tree().call_group("game", "cheer", "SQUISH!", node.global_position + Vector3.UP * 1.6)
+	node.get_tree().call_group("game", "play_sound", "splat", node.global_position)
+	node.set_deferred("process_mode", Node.PROCESS_MODE_DISABLED)
+	# A tree tween: the node itself is disabled so it stops moving and hitting.
+	var tw := node.get_tree().create_tween()
+	tw.tween_property(node, "scale", Vector3(1.5, 0.08, 1.5), 0.18).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(0.5)
+	tw.tween_callback(node.queue_free)

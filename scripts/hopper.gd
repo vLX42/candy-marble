@@ -77,6 +77,12 @@ func threat_at(ahead: float) -> Variant:
 
 func _on_hit(body: Node3D) -> void:
 	if body is Ball:
+		if body is Steelie:
+			return
+		if body.silly:
+			# Silly Race: the marble squishes the monster.
+			Palette.squish(self)
+			return
 		if body.rush:
 			get_tree().call_group("game", "cheer", "WHOOSH!", global_position + Vector3.UP * 2.0)
 			return

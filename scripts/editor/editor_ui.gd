@@ -607,7 +607,7 @@ func on_tool_changed() -> void:
 				b.add_theme_stylebox_override(st, sb)
 			g.add_child(b)
 		_options.add_child(_label("Each step is half a marble high. A tile next to a higher one is a wall.", true))
-	if t in ["paint", "raise", "lower", "ramp", "erase", "waves", "hill", "trench", "goo", "humps", "clear"]:
+	if t in ["paint", "raise", "lower", "ramp", "erase", "waves", "hill", "trench", "goo", "humps", "ice", "clear"]:
 		_options.add_child(CandyTheme.caption("Brush  ([ and ])"))
 		var row := HBoxContainer.new()
 		_options.add_child(row)
@@ -839,6 +839,7 @@ func _inspector_char(ch: String) -> void:
 		"W": "Wobbly ripples. Neighbouring wave tiles blend together.",
 		"H": "A round bump.", "T": "A dip. Neighbouring trench tiles join into a channel.",
 		"A": "Sour goo. Rolling in pops the marble.",
+		"I": "Ice: hardly any grip.",
 		"M": "Big humps. A strip of hump tiles makes whole humps along its long side.",
 	}
 	if BOOSTER_TEXT.has(ch):
@@ -900,6 +901,14 @@ func refresh_level() -> void:
 		ed.set_level_value("race", on)
 		ed.mark_edited())
 	_level_box.add_child(race)
+	var silly := CheckBox.new()
+	silly.text = "Silly level: slopes push uphill, monsters are harmless"
+	silly.focus_mode = Control.FOCUS_NONE
+	silly.button_pressed = lv.get("silly", false)
+	silly.toggled.connect(func(on: bool) -> void:
+		ed.set_level_value("silly", on)
+		ed.mark_edited())
+	_level_box.add_child(silly)
 	_slider(_level_box, "Rival speed", 0.5, 1.6, 0.05, lv.rival_speed, func(v: float) -> void:
 		ed.set_level_value("rival_speed", v), "%.2fx")
 	_color(_level_box, "Rival colour", lv.rival_tint, func(v: String) -> void:
