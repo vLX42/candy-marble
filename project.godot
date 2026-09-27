@@ -13,7 +13,13 @@ config_version=5
 config/name="Candy Marble"
 config/description="Isometric candy marble game prototype"
 run/main_scene="res://scenes/title.tscn"
+config/version="1.0.0"
 config/features=PackedStringArray("4.7", "Forward Plus")
+config/icon="res://icon.png"
+boot_splash/bg_color=Color(0.976, 0.776, 0.827, 1)
+boot_splash/image="res://art/ui/logo.png"
+boot_splash/fullsize=false
+boot_splash/use_filter=true
 
 [autoload]
 

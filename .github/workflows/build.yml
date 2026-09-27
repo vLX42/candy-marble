@@ -1,0 +1,153 @@
+name: Build
+
+# Every push: tests + level bots, then Windows / macOS / Linux / Web exports.
+# Pushes to main: the site (with the web build under /play) goes to GitHub Pages.
+# Tags v*: a GitHub release with the three desktop zips.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: "4.7.2"
+  GODOT_BASE: https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot
+        run: |
+          curl -sSfL -o godot.zip "$GODOT_BASE/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          sudo mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+          godot --version
+
+      - name: Import assets
+        run: godot --headless --import || godot --headless --import
+
+      - name: Tests
+        run: |
+          set -e
+          for t in playtest race_test hazards_test madness_test flow_test editor_test sections_test; do
+            echo "::group::$t"
+            godot --headless --fixed-fps 120 -s tests/$t.gd
+            echo "::endgroup::"
+          done
+
+      - name: Level bots
+        run: |
+          set -e
+          godot --headless --fixed-fps 120 -s tests/levels_test.gd
+          godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/marble_madness.json
+          godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/sweet_starter.json
+
+  export:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot
+        run: |
+          curl -sSfL -o godot.zip "$GODOT_BASE/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          sudo mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+
+      - name: Cache export templates
+        id: templates
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.stable
+          key: godot-templates-${{ env.GODOT_VERSION }}
+
+      - name: Install export templates
+        if: steps.templates.outputs.cache-hit != 'true'
+        run: |
+          curl -sSfL -o templates.tpz "$GODOT_BASE/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          unzip -q templates.tpz
+          mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          mv templates/* ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/
+
+      - name: Import assets
+        run: godot --headless --import || godot --headless --import
+
+      - name: Export
+        run: |
+          set -e
+          mkdir -p build/windows build/macos build/linux build/web dist
+          godot --headless --export-release "Windows" build/windows/CandyMarble.exe
+          godot --headless --export-release "macOS" build/macos/CandyMarble-macos.zip
+          godot --headless --export-release "Linux" build/linux/CandyMarble.x86_64
+          godot --headless --export-release "Web" build/web/index.html
+          ls -la build/*
+
+      - name: Package
+        run: |
+          set -e
+          (cd build/windows && zip -qr ../../dist/CandyMarble-windows.zip .)
+          chmod +x build/linux/CandyMarble.x86_64
+          (cd build/linux && zip -qr ../../dist/CandyMarble-linux.zip .)
+          cp build/macos/CandyMarble-macos.zip dist/
+          mkdir -p public
+          cp -r site/. public/
+          cp -r build/web public/play
+          ls -la dist public
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: candy-marble-builds
+          path: dist/*.zip
+
+      - name: Upload site for Pages
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  pages:
+    needs: export
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+  release:
+    needs: export
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: candy-marble-builds
+          path: dist
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.zip \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Candy Marble ${GITHUB_REF_NAME#v}" \
+            --notes "Download the zip for your system. Or play it in the browser: https://vlx42.github.io/candy-marble/play/
+
+          macOS: the app isn't notarized, so the first time right-click it and pick Open."

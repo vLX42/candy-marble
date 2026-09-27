@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Candy Marble</title>
+<meta name="description" content="A marble race through candyland. Roll down candy mountains, dodge sour goo, race the licorice ball and build your own levels. Free for Windows, macOS, Linux and the browser.">
+<meta property="og:title" content="Candy Marble">
+<meta property="og:description" content="A marble race through candyland, in the spirit of Marble Madness. Free, with a level editor.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://vlx42.github.io/candy-marble/img/title.jpg">
+<link rel="icon" href="img/icon.png">
+<style>
+  @font-face {
+    font-family: "Fredoka";
+    src: url("fonts/Fredoka.ttf") format("truetype");
+    font-weight: 300 700;
+    font-display: swap;
+  }
+  :root {
+    --cream: #FFF4E0;
+    --pink: #F7B2C0;
+    --pink-soft: #F9C6D3;
+    --lilac: #C9B8EC;
+    --mint: #A8E6C8;
+    --lemon: #F6E27A;
+    --sky: #A9D6F5;
+    --coral: #F6845E;
+    --rasp: #C8204F;
+    --choc: #5A3426;
+    --ink: #3A1F2B;
+    --muted: #8A6A70;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: "Fredoka", ui-rounded, "Nunito", system-ui, sans-serif;
+    color: var(--choc);
+    background: linear-gradient(180deg, #D6ECF8 0%, #F3DDEB 45%, #FBE3EA 100%);
+    min-height: 100vh;
+    line-height: 1.5;
+    font-size: 18px;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  /* Sprinkles in the background */
+  body::before {
+    content: "";
+    position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background-image:
+      radial-gradient(circle at 12% 18%, rgba(255,255,255,.7) 0 3px, transparent 4px),
+      radial-gradient(circle at 78% 12%, rgba(246,226,122,.6) 0 3px, transparent 4px),
+      radial-gradient(circle at 88% 64%, rgba(168,230,200,.7) 0 3px, transparent 4px),
+      radial-gradient(circle at 22% 72%, rgba(201,184,236,.7) 0 3px, transparent 4px),
+      radial-gradient(circle at 55% 38%, rgba(247,178,192,.7) 0 3px, transparent 4px);
+    background-size: 340px 300px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+
+  /* Hero */
+  .hero { text-align: center; padding: 40px 0 24px; }
+  .logo { width: min(560px, 92%); height: auto; filter: drop-shadow(0 12px 18px rgba(90,52,38,.18)); animation: drop .9s cubic-bezier(.3,1.5,.5,1) both; }
+  @keyframes drop { from { transform: translateY(-60px) scale(.9); opacity: 0; } to { transform: none; opacity: 1; } }
+  .tag { font-size: clamp(20px, 3vw, 28px); font-weight: 600; margin-top: 6px; }
+  .sub { color: var(--muted); max-width: 620px; margin: 8px auto 0; }
+
+  .buttons { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; margin: 28px 0 10px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    font: inherit; font-weight: 700; font-size: 20px; color: var(--choc);
+    text-decoration: none; cursor: pointer;
+    background: var(--cream);
+    border: 4px solid var(--pink); border-radius: 22px;
+    padding: 12px 24px;
+    box-shadow: 0 5px 0 rgba(200,32,79,.18), 0 10px 22px rgba(90,52,38,.12);
+    transition: transform .12s ease, background .12s ease, border-color .12s ease;
+  }
+  .btn:hover, .btn:focus-visible { transform: translateY(-2px) scale(1.03); background: var(--lemon); border-color: var(--coral); outline: none; }
+  .btn:active { transform: translateY(1px); }
+  .btn.play { background: var(--mint); border-color: #4FB58A; font-size: 22px; }
+  .btn.main { background: var(--lemon); border-color: var(--coral); }
+  .btn small { font-weight: 500; font-size: 14px; color: var(--muted); }
+  .btn svg { width: 22px; height: 22px; flex: none; }
+  .note { font-size: 15px; color: var(--muted); text-align: center; }
+  .note a { color: var(--rasp); }
+
+  /* Trailer */
+  .video {
+    margin: 30px auto 0; max-width: 960px;
+    border: 6px solid var(--cream); border-radius: 26px; overflow: hidden;
+    box-shadow: 0 18px 40px rgba(90,52,38,.22);
+    background: var(--pink-soft);
+    aspect-ratio: 16 / 9;
+  }
+  .video video { width: 100%; height: 100%; display: block; object-fit: cover; }
+
+  /* Sections */
+  section { padding: 56px 0 8px; }
+  h2 {
+    font-size: clamp(30px, 4.5vw, 44px); font-weight: 700; text-align: center; margin-bottom: 20px;
+    color: var(--choc);
+    text-shadow: 0 2px 0 var(--cream), 0 4px 0 rgba(90,52,38,.12);
+  }
+  h2 span:nth-child(5n+1) { color: #F4829F; }
+  h2 span:nth-child(5n+2) { color: #6CC79F; }
+  h2 span:nth-child(5n+3) { color: #E8B930; }
+  h2 span:nth-child(5n+4) { color: #9C7FE0; }
+  h2 span:nth-child(5n+5) { color: #5EA9DD; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+  .card {
+    background: var(--cream); border: 4px solid var(--pink); border-radius: 24px;
+    padding: 20px 22px; box-shadow: 0 8px 20px rgba(90,52,38,.1);
+  }
+  .card h3 { font-size: 22px; margin-bottom: 4px; }
+  .card p { color: #6E4A40; font-size: 17px; }
+  .card .chip { display: inline-block; font-size: 13px; font-weight: 700; padding: 2px 10px; border-radius: 99px; margin-bottom: 8px; }
+
+  .shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .shots figure { margin: 0; background: var(--cream); border: 4px solid var(--cream); border-radius: 20px; overflow: hidden; box-shadow: 0 10px 24px rgba(90,52,38,.14); }
+  .shots img { width: 100%; display: block; aspect-ratio: 16 / 9; object-fit: cover; transition: transform .3s ease; }
+  .shots figure:hover img { transform: scale(1.04); }
+  .shots figcaption { padding: 8px 14px 10px; font-weight: 600; font-size: 16px; }
+
+  .split { display: grid; grid-template-columns: 1.1fr 1fr; gap: 26px; align-items: center; }
+  .split img { width: 100%; border-radius: 20px; border: 4px solid var(--cream); box-shadow: 0 12px 28px rgba(90,52,38,.16); }
+  .split ul { list-style: none; }
+  .split li { padding: 7px 0 7px 34px; position: relative; }
+  .split li::before { content: ""; position: absolute; left: 4px; top: 13px; width: 16px; height: 16px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff 0 25%, var(--pink) 26%); box-shadow: 0 2px 0 rgba(200,32,79,.3); }
+
+  .keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px 20px; max-width: 760px; margin: 0 auto; }
+  .keys div { display: flex; gap: 10px; align-items: baseline; }
+  kbd { font: inherit; font-weight: 700; font-size: 15px; background: var(--cream); border: 3px solid var(--lilac); border-bottom-width: 5px; border-radius: 10px; padding: 1px 9px; white-space: nowrap; }
+
+  footer { text-align: center; padding: 60px 0 40px; color: var(--muted); font-size: 15px; }
+  footer a { color: var(--rasp); }
+
+  @media (max-width: 760px) {
+    .split { grid-template-columns: 1fr; }
+    .btn { font-size: 18px; padding: 10px 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <img class="logo" src="img/logo.png" alt="Candy Marble" width="900" height="469">
+    <p class="tag">A marble race through candyland.</p>
+    <p class="sub">Roll a peppermint marble down candy mountains, dodge sour goo and wind-up monsters, race the licorice ball and build your own levels. Free.</p>
+
+    <div class="buttons">
+      <a class="btn play" href="play/">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>
+        Play in your browser
+      </a>
+      <a class="btn main" id="main-dl" href="https://github.com/vLX42/candy-marble/releases/latest">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19h14"/></svg>
+        <span id="main-label">Download</span>
+      </a>
+    </div>
+    <div class="buttons" id="others">
+      <a class="btn" data-os="windows" href="https://github.com/vLX42/candy-marble/releases/latest/download/CandyMarble-windows.zip">Windows <small>zip</small></a>
+      <a class="btn" data-os="mac" href="https://github.com/vLX42/candy-marble/releases/latest/download/CandyMarble-macos.zip">macOS <small>Apple Silicon + Intel</small></a>
+      <a class="btn" data-os="linux" href="https://github.com/vLX42/candy-marble/releases/latest/download/CandyMarble-linux.zip">Linux <small>x86_64</small></a>
+    </div>
+    <p class="note">Mac: it isn't notarized, so the first time right-click the app and pick Open. The browser version runs best in Chrome or Edge.</p>
+
+    <div class="video">
+      <video src="trailer.mp4" poster="trailer.jpg" autoplay muted loop playsinline controls preload="metadata"></video>
+    </div>
+  </header>
+
+  <section>
+    <h2 aria-label="What's in it">What's in it</h2>
+    <div class="cards">
+      <div class="card"><span class="chip" style="background:var(--mint)">6 LEVELS</span><h3>The candy campaign</h3><p>From Sugar Lane to Pinball Parlor. Loops, cannons, catapults, bumpers and a lot of drops.</p></div>
+      <div class="card"><span class="chip" style="background:var(--lilac)">5 LEVELS</span><h3>Marble Madness quest</h3><p>Spiral mountains, skinny catwalks, sour goo and humps. Big drops break the marble, just like the arcade.</p></div>
+      <div class="card"><span class="chip" style="background:var(--pink)">RACES</span><h3>Beat the licorice ball</h3><p>Some levels are a race. It rolls the same physics as you, so it bumps back.</p></div>
+      <div class="card"><span class="chip" style="background:var(--lemon)">GHOSTS</span><h3>Race your best run</h3><p>Your fastest run on every level comes back as a see-through marble to beat. Gold, silver and bronze for par times.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2 aria-label="Screenshots">Screenshots</h2>
+    <div class="shots">
+      <figure><img src="img/spiral.jpg" alt="Spiral Summit, winding down a candy mountain" loading="lazy"><figcaption>Spiral Summit: no rails, long way down</figcaption></figure>
+      <figure><img src="img/catwalks.jpg" alt="A one tile balance beam high above the clouds" loading="lazy"><figcaption>Sky Catwalks: the balance beam</figcaption></figure>
+      <figure><img src="img/humps.jpg" alt="The hump bridge in Goo Gorge" loading="lazy"><figcaption>Goo Gorge: the hump bridge</figcaption></figure>
+      <figure><img src="img/pinball.jpg" alt="A pinball hoop and cannon" loading="lazy"><figcaption>Cannons, hoops and pinball toys</figcaption></figure>
+      <figure><img src="img/title.jpg" alt="Title screen" loading="lazy"><figcaption>The title island</figcaption></figure>
+      <figure><img src="img/editor.jpg" alt="The level editor with track pieces" loading="lazy"><figcaption>The level editor</figcaption></figure>
+    </div>
+  </section>
+
+  <section>
+    <h2 aria-label="Build your own">Build your own</h2>
+    <div class="split">
+      <img src="img/editor.jpg" alt="Level editor" loading="lazy">
+      <ul>
+        <li><b>29 ready-made pieces</b> that snap together. Click Straight, Ramp, Loop, Finish and you have a level.</li>
+        <li><b>Road tool</b> draws a lane between two spots and ramps up or down to meet them.</li>
+        <li><b>A guide</b> tells you the next step and shows where the marble can't get to.</li>
+        <li>Monsters with their own <b>speed and colour</b>, goo, humps, tall cliffs and hard landings.</li>
+        <li>Pack levels into a <b>quest</b> and share it as one line of text or a file. Friends paste it and play.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2 aria-label="Controls">Controls</h2>
+    <div class="keys">
+      <div><kbd>WASD</kbd><kbd>Arrows</kbd> roll</div>
+      <div><kbd>Stick</kbd> roll with a pad</div>
+      <div><kbd>R</kbd> restart the level</div>
+      <div><kbd>Esc</kbd><kbd>P</kbd> pause</div>
+      <div><kbd>F11</kbd> fullscreen</div>
+      <div><kbd>F5</kbd> test play in the editor</div>
+    </div>
+  </section>
+
+  <footer>
+    Made by Peter Biro with <a href="https://godotengine.org">Godot</a>.
+    Source and releases on <a href="https://github.com/vLX42/candy-marble">GitHub</a>.
+    Font: Fredoka (<a href="fonts/OFL.txt">OFL</a>).
+  </footer>
+</div>
+
+<script>
+  // Colour the section titles letter by letter, like the game's logo.
+  document.querySelectorAll("h2").forEach(h => {
+    h.innerHTML = [...h.textContent].map(c => c === " " ? " " : `<span>${c}</span>`).join("");
+  });
+  // Put the right download first.
+  (function () {
+    const ua = navigator.userAgent.toLowerCase();
+    const os = /mac/.test(ua) && !/iphone|ipad/.test(ua) ? "mac" : /win/.test(ua) ? "windows" : /linux/.test(ua) && !/android/.test(ua) ? "linux" : null;
+    const names = { mac: "Download for macOS", windows: "Download for Windows", linux: "Download for Linux" };
+    if (!os) { document.getElementById("main-dl").style.display = "none"; return; }
+    const link = document.querySelector(`#others [data-os="${os}"]`);
+    document.getElementById("main-dl").href = link.href;
+    document.getElementById("main-label").textContent = names[os];
+    link.style.display = "none";
+  })();
+</script>
+</body>
+</html>

@@ -1,5 +1,7 @@
 # Candy Marble
 
+**Play it in the browser or download it: https://vlx42.github.io/candy-marble/**
+
 Isometric marble racer in the spirit of Marble Madness, with a candy-toy look.
 Godot 4.7 (Jolt physics), models built with Blender scripts.
 
@@ -152,6 +154,23 @@ maps and shaded by `scripts/terrain.gdshader` (pillow tiles, icing, chocolate).
 
 `audio/*.mp3` loop per level (crossfaded), "Gold Star Finish" plays after the
 last level.
+
+## Builds and releases
+
+`.github/workflows/build.yml` runs on every push: all tests and level bots, then
+Windows, macOS (universal, ad-hoc signed), Linux and Web exports
+(`export_presets.cfg`). Pushes to main deploy `site/` plus the web build (under
+`/play`) to GitHub Pages. Pushing a tag like `v1.0.1` also publishes a GitHub
+release with `CandyMarble-windows.zip`, `CandyMarble-macos.zip` and
+`CandyMarble-linux.zip`; the site links to `releases/latest`, so it always
+serves the newest one.
+
+```bash
+git tag v1.0.1 && git push origin v1.0.1
+```
+
+Sounds are made by `tools/make_sfx.py`, the app icon by
+`tools/make_app_icon.gd`.
 
 ## Tests
 
