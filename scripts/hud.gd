@@ -430,6 +430,13 @@ func _build_touch() -> void:
 func _process(_delta: float) -> void:
 	if _stick and Tilt.is_touch():
 		_stick.queue_redraw()
+	# Upright phones: pause button at the bottom, in thumb reach.
+	if _pause_button:
+		var bottom := Tilt.is_portrait()
+		_pause_button.anchor_top = 1.0 if bottom else 0.0
+		_pause_button.anchor_bottom = 1.0 if bottom else 0.0
+		_pause_button.offset_top = -110.0 if bottom else 16.0
+		_pause_button.offset_bottom = -34.0 if bottom else 88.0
 
 
 func _draw_stick() -> void:

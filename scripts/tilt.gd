@@ -57,8 +57,8 @@ var _stick_pos := Vector2.ZERO
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_web = OS.has_feature("web")
-	# Phones held upright: lay the UI out for a 900 wide screen so it scales
-	# by the short side, like in landscape.
+	# Phones held upright: lay the UI out for a 620 wide screen, so text and
+	# buttons stay a comfortable size.
 	get_tree().root.size_changed.connect(_fit_orientation)
 	_fit_orientation()
 	if _web:
@@ -69,7 +69,7 @@ func _ready() -> void:
 func _fit_orientation() -> void:
 	var root := get_tree().root
 	var s := root.size
-	var want := Vector2i(900, 1600) if s.y > s.x else Vector2i(1600, 900)
+	var want := Vector2i(620, 1100) if s.y > s.x else Vector2i(1600, 900)
 	if root.content_scale_size != want:
 		root.content_scale_size = want
 

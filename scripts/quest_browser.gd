@@ -38,16 +38,28 @@ func _ready() -> void:
 	sub.text = "level packs made in the editor, by you and your friends"
 	sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sub.size_flags_vertical = Control.SIZE_SHRINK_END
+	sub.clip_text = true
+	sub.custom_minimum_size.x = 20
+	# Too long for an upright phone.
+	sub.visible = not Tilt.is_portrait()
 	top.add_child(sub)
 	top.add_child(_btn("Back", func() -> void: closed.emit()))
 
-	var body := HBoxContainer.new()
+	# Upright phones: the list goes above the details.
+	var narrow := Tilt.is_portrait()
+	if narrow:
+		offset_left = 16
+		offset_right = -16
+		offset_top = 16
+		offset_bottom = -16
+	var body := BoxContainer.new()
+	body.vertical = narrow
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_theme_constant_override("separation", 22)
 	root.add_child(body)
 
 	var left := VBoxContainer.new()
-	left.custom_minimum_size.x = 470
+	left.custom_minimum_size = Vector2(470, 0) if not narrow else Vector2(0, 330)
 	left.add_theme_constant_override("separation", 10)
 	body.add_child(left)
 	_list = ItemList.new()
@@ -75,6 +87,7 @@ func _ready() -> void:
 
 	var right_scroll := ScrollContainer.new()
 	right_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	right_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	body.add_child(right_scroll)
 	_detail = VBoxContainer.new()

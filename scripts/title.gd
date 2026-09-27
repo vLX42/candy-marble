@@ -188,12 +188,13 @@ func _build_ui() -> void:
 	_update_fullscreen_label()
 
 	_levels_panel = VBoxContainer.new()
-	_levels_panel.position = Vector2(84, 390)
+	var narrow := Tilt.is_portrait()
+	_levels_panel.position = Vector2(84, 390) if not narrow else Vector2(40, 330)
 	_levels_panel.add_theme_constant_override("separation", 14)
 	_levels_panel.visible = false
 	root.add_child(_levels_panel)
 	var grid := GridContainer.new()
-	grid.columns = 3
+	grid.columns = 3 if not narrow else 1
 	grid.add_theme_constant_override("h_separation", 14)
 	grid.add_theme_constant_override("v_separation", 14)
 	_levels_panel.add_child(grid)
@@ -209,7 +210,7 @@ func _build_ui() -> void:
 		if i >= unlocked:
 			b.text = "%d  %s\nlocked\nfinish level %d" % [i + 1, lvl.title, i]
 			b.disabled = true
-		b.custom_minimum_size = Vector2(330, 118)
+		b.custom_minimum_size = Vector2(330, 118) if not narrow else Vector2(540, 96)
 		b.add_theme_font_size_override("font_size", 24)
 		grid.add_child(b)
 	_levels_panel.add_child(_button("Back", _show_menu))
@@ -388,7 +389,7 @@ func _build_settings(root: Control) -> void:
 	var back := _button("Back", _show_menu)
 	back.add_theme_font_size_override("font_size", 24)
 	var row := _pair(reset, back)
-	row.custom_minimum_size.x = 620
+	row.custom_minimum_size.x = 620 if not Tilt.is_portrait() else 500
 	reset.size_flags_stretch_ratio = 2.2
 	_settings_panel.add_child(row)
 
@@ -396,7 +397,7 @@ func _build_settings(root: Control) -> void:
 ## A button whose label comes from `label` and refreshes after `action`.
 func _setting_button(label: Callable, action: Callable) -> Button:
 	var b := _button(label.call(), func() -> void: pass)
-	b.custom_minimum_size = Vector2(620, 0)
+	b.custom_minimum_size = Vector2(620 if not Tilt.is_portrait() else 500, 0)
 	b.add_theme_font_size_override("font_size", 26)
 	b.pressed.connect(func() -> void:
 		action.call()
@@ -418,7 +419,7 @@ func _slider(title: String, value: float, on_change: Callable) -> Control:
 	s.max_value = 1.0
 	s.step = 0.05
 	s.value = value
-	s.custom_minimum_size = Vector2(450, 34)
+	s.custom_minimum_size = Vector2(450 if not Tilt.is_portrait() else 330, 34)
 	s.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	s.value_changed.connect(on_change)
 	row.add_child(s)

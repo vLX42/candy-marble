@@ -80,6 +80,9 @@ func _apply() -> void:
 	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("SFX"), linear_to_db(maxf(sfx_volume, 0.0001)))
 	if DisplayServer.get_name() == "headless":
 		return
+	# "-- --windowed": never go fullscreen this run (tests, screenshots).
+	if "--windowed" in OS.get_cmdline_user_args():
+		return
 	var want := DisplayServer.WINDOW_MODE_FULLSCREEN if fullscreen else DisplayServer.WINDOW_MODE_WINDOWED
 	if DisplayServer.window_get_mode() != want:
 		DisplayServer.window_set_mode(want)
