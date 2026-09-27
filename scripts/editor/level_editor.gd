@@ -21,6 +21,10 @@ static var session_view := {}
 
 ## [id, label, group, hint]
 const TOOLS := [
+	["sections", "Sections", "Build", "Ready-made track pieces, in the Pieces tab on the right. Clicking one adds it at the green arrow. Clicking the map puts the picked piece there instead; R turns it."],
+	["road", "Road", "Build", "Drag to draw a lane with rails. It keeps the height where you start, opens walls and ramps up or down to meet other ground."],
+	["select", "Select", "Build", "Click a thing to tweak it, drag to move it. Shift snaps to half tiles."],
+	["route", "Path", "Build", "Rival and camera path. Click to add points, right click removes the last."],
 	["paint", "Paint", "Ground", "Paint ground at the chosen height. Paint past the edge to grow the map."],
 	["box", "Box", "Ground", "Drag out a rectangle of ground. Tick Walls to get a rail around it."],
 	["raise", "Raise", "Ground", "Click or drag to lift tiles one step."],
@@ -54,8 +58,6 @@ const TOOLS := [
 	["hoop", "Hoop", "Toys", "Ring to jump through."],
 	["spinner", "Spinner", "Toys", "Spinning gate."],
 	["redirect", "Turner", "Toys", "Catches the marble and launches it the way it points."],
-	["select", "Select", "Edit", "Click a thing to tweak it, drag to move it. Shift snaps to half tiles."],
-	["route", "Path", "Edit", "Rival and camera path. Click to add points, right click removes the last."],
 ]
 const OBJ_CHAR := {spawn = "S", goal = "G", bumper = "B", star = "@", target = "#",
 	waves = "W", hill = "H", trench = "T"}
@@ -73,7 +75,7 @@ const EXTRA_NAMES := {
 	"slingshot": "Slingshot", "cannon": "Cannon", "catapult": "Catapult", "loop": "Loop", "chute": "Chute",
 	"hoop": "Hoop", "spinner": "Spinner", "redirect": "Turner",
 }
-const PAINT_TOOLS := ["paint", "raise", "lower", "ramp", "erase", "waves", "hill", "trench", "clear", "decor",
+const PAINT_TOOLS := ["road", "paint", "raise", "lower", "ramp", "erase", "waves", "hill", "trench", "clear", "decor",
 	"bumper", "star", "target", "booster"]
 const MAX_UNDO := 120
 
@@ -81,6 +83,8 @@ signal selection_changed
 signal level_changed
 ## Tiles or size changed (cheaper than level_changed for the panels).
 signal map_changed
+## The preview was rebuilt (the guide refreshes on this).
+signal rebuilt
 signal quest_changed
 
 var quest: Quest
@@ -88,7 +92,17 @@ var li := 0
 var lv: Dictionary
 var built: CustomLevel
 
-var tool := "paint"
+var tool := "sections"
+var section_id := "straight"
+var section_heading := 0
+var road_width := 4
+var road_rails := true
+## Guide: shade ground the marble can't reach and point at the gap.
+var show_reach := true
+## Set after a test play, cleared by the next edit.
+static var session_tested := false
+var tested := false
+var reach := {}
 var tier := 1
 var brush := 1
 var ramp_dir := "auto"
@@ -136,6 +150,11 @@ var _t := 0.0
 var _shift := Vector2i.ZERO   # total growth to the left/top, for strokes that grow the map
 var _merge_key := ""
 var _drag_undo := false
+var _road_tiles := {}
+var _road_tier := 0
+var _road_heading := 0
+var _road_square: Array[Vector2i] = []
+var _ghost_mesh: MeshInstance3D
 ## Preview terrain is built in CHUNK x CHUNK tile pieces so painting only
 ## rebuilds the pieces it touches.
 const CHUNK := 12
@@ -164,6 +183,9 @@ func _ready() -> void:
 	_grid_mesh = MeshInstance3D.new()
 	_grid_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	overlay.add_child(_grid_mesh)
+	_ghost_mesh = MeshInstance3D.new()
+	_ghost_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	overlay.add_child(_ghost_mesh)
 	_hover_mesh = MeshInstance3D.new()
 	_hover_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	overlay.add_child(_hover_mesh)
@@ -192,6 +214,7 @@ func _ready() -> void:
 		_apply_camera()
 	session_quest = null
 	session_view = {}
+	tested = session_tested
 	get_window().files_dropped.connect(_on_files_dropped)
 	var music := "res://audio/Spun_Sugar_Waltz.mp3"
 	if ResourceLoader.exists(music):
@@ -264,6 +287,8 @@ func save() -> void:
 ## `tiles_only`: only map characters changed (set_h / set_o), so the preview
 ## can rebuild just the touched chunks.
 func mark_edited(tiles_only: bool = false) -> void:
+	tested = false
+	session_tested = false
 	if not tiles_only:
 		_tiles_only = false
 	dirty = true
@@ -328,13 +353,15 @@ func resize(left: int, top: int, right: int, bottom: int) -> void:
 	if w < 3 or h < 3 or w > CustomLevel.MAX_SIZE or h > CustomLevel.MAX_SIZE:
 		ui.toast("The map can be 3 to %d tiles on each side" % CustomLevel.MAX_SIZE)
 		return
+	var old_w := cols()
+	var old_h := rows()
 	for key in ["heights", "objects"]:
 		var out: Array = []
 		for j in h:
 			var jo := j - top
-			var line: String = lv[key][jo] if jo >= 0 and jo < rows() else ""
+			var line: String = lv[key][jo] if jo >= 0 and jo < old_h else ""
 			if line == "":
-				line = ".".repeat(cols())
+				line = ".".repeat(old_w)
 			line = (".".repeat(left) + line) if left >= 0 else line.substr(-left)
 			out.append(line.substr(0, w).rpad(w, "."))
 		lv[key] = out
@@ -350,6 +377,15 @@ func resize(left: int, top: int, right: int, bottom: int) -> void:
 	for p: Array in lv.route:
 		route.append([p[0] + left, p[1] + top])
 	lv.route = route
+	if lv.has("track_end"):
+		lv.track_end = [lv.track_end[0] + left, lv.track_end[1] + top, lv.track_end[2], lv.track_end[3]]
+	if not _road_tiles.is_empty():
+		var moved := {}
+		for t: Vector2i in _road_tiles:
+			moved[t + Vector2i(left, top)] = true
+		_road_tiles = moved
+		for k in _road_square.size():
+			_road_square[k] += Vector2i(left, top)
 	cam_target += Vector3(left * TILE, 0, top * TILE)
 	_stroke_start += Vector2i(left, top)
 	_shift += Vector2i(left, top)
@@ -488,7 +524,17 @@ func _stroke_begin(tile: Vector2i, f: Vector2, shift: bool) -> void:
 		return
 	if tool == "box":
 		return
+	if tool == "sections":
+		_place_section_at(tile)
+		_stroke = false
+		return
 	push_undo()
+	if tool == "road":
+		_road_tiles = {}
+		_road_square = []
+		_road_heading = 0
+		var c := hchar(tile.x, tile.y)
+		_road_tier = int(c) if c.is_valid_int() else tier
 	_apply(tile, f, shift)
 
 
@@ -498,6 +544,13 @@ func _stroke_move(tile: Vector2i, f: Vector2, shift: bool) -> void:
 	if tool == "select":
 		_drag_selection(tile, f, shift)
 	elif tool in PAINT_TOOLS:
+		if tool == "road":
+			var dv := tile - _last_tile
+			if dv != Vector2i.ZERO:
+				if absi(dv.x) >= absi(dv.y):
+					_road_heading = 0 if dv.x > 0 else 2
+				else:
+					_road_heading = 1 if dv.y > 0 else 3
 		# Fill in the tiles between mouse samples so fast strokes have no gaps.
 		# Growing the map shifts coordinates; later points follow the shift.
 		var from := _last_tile
@@ -522,6 +575,8 @@ func _stroke_end(tile: Vector2i, f: Vector2, _shift: bool) -> void:
 	if tool == "box":
 		push_undo()
 		_fill_box(_stroke_start, tile)
+	if tool == "road":
+		_finish_road()
 	# Settle everything the stroke touched, with room for long ramp runs.
 	_dirty_tiles.merge(_stroke_dirty)
 	_stroke_dirty = {}
@@ -535,6 +590,21 @@ func _stroke_end(tile: Vector2i, f: Vector2, _shift: bool) -> void:
 
 func _apply(tile: Vector2i, f: Vector2, shift: bool) -> void:
 	match tool:
+		"road":
+			var s3 := _shift
+			var lo := -(road_width - 1) / 2
+			var sq: Array[Vector2i] = []
+			for dj in range(lo, lo + road_width):
+				for di in range(lo, lo + road_width):
+					var g := ensure_tile(tile.x + di + _shift.x - s3.x, tile.y + dj + _shift.y - s3.y)
+					if g.x >= 0:
+						set_h(g.x, g.y, str(_road_tier))
+						_road_tiles[g] = true
+						sq.append(g)
+			# Keep the last square in the latest coordinates.
+			for k in sq.size():
+				sq[k] += _shift - s3
+			_road_square = sq
 		"paint":
 			var s0 := _shift
 			for t in _brush_tiles(tile):
@@ -851,6 +921,11 @@ func _drag_selection(tile: Vector2i, f: Vector2, shift: bool) -> void:
 
 
 func rotate_selection(step: float = 90.0) -> void:
+	if tool == "sections":
+		section_heading = (section_heading + 1) % 4
+		_update_hover()
+		ui.on_tool_changed()
+		return
 	var e := selected_extra()
 	if not e.is_empty():
 		push_undo()
@@ -1011,6 +1086,318 @@ func has_char(c: String) -> bool:
 	return false
 
 
+# --- track sections -----------------------------------------------------------------
+
+func track_end() -> Array:
+	return lv.get("track_end", [])
+
+
+## Palette button: add a section to the open end of the track.
+func add_section(id: String) -> void:
+	section_id = id
+	if tool != "sections":
+		set_tool("sections")
+	var te := track_end()
+	if te.is_empty():
+		ui.on_tool_changed()
+		ui.toast("No open track end. Click on the map to put the %s there" % TrackPieces.label_of(id).to_lower())
+		_update_hover()
+		return
+	_put_section(id, Vector2i(te[0], te[1]), te[2], te[3], true)
+
+
+## Origin for a piece whose lane should start at `tile` facing `h`.
+func _section_origin(tile: Vector2i, h: int) -> Vector2i:
+	return tile - TrackPieces.L[h] * 2
+
+
+func _section_tier(tile: Vector2i) -> int:
+	var c := hchar(tile.x, tile.y)
+	var t := int(c) if c.is_valid_int() else tier
+	return t + TrackPieces.get_piece(section_id).entry
+
+
+func _place_section_at(tile: Vector2i) -> void:
+	_put_section(section_id, _section_origin(tile, section_heading), section_heading, _section_tier(tile), false)
+
+
+func _put_section(id: String, origin: Vector2i, h: int, t: int, at_end: bool) -> bool:
+	var piece := TrackPieces.get_piece(id)
+	var res := TrackPieces.stamp(piece, origin, h, t)
+	if not res.ok:
+		ui.toast(res.why)
+		return false
+	push_undo()
+	var lo := Vector2i(1000000, 1000000)
+	var hi := -lo
+	for c: Vector2i in res.cells:
+		lo = lo.min(c)
+		hi = hi.max(c)
+	var s0 := _shift
+	if ensure_tile(lo.x, lo.y).x < 0 or ensure_tile(hi.x + _shift.x - s0.x, hi.y + _shift.y - s0.y).x < 0:
+		ui.toast("The map can't get any bigger")
+		undo()
+		return false
+	var d := _shift - s0
+	for v: Array in res.cells.values():
+		for ch in ["S", "G"]:
+			if v[1] == ch:
+				for j in rows():
+					var at: int = (lv.objects[j] as String).find(ch)
+					if at >= 0:
+						set_o(at, j, ".")
+	for c: Vector2i in res.cells:
+		var v: Array = res.cells[c]
+		if v[0] != ".":
+			set_h(c.x + d.x, c.y + d.y, v[0])
+		if v[1] != ".":
+			set_o(c.x + d.x, c.y + d.y, v[1])
+	for e: Dictionary in res.extras:
+		e.tile = [e.tile[0] + d.x, e.tile[1] + d.y]
+		if e.has("target_tile"):
+			e.target_tile = [e.target_tile[0] + d.x, e.target_tile[1] + d.y]
+		lv.extras.append(e)
+	var route: Array = []
+	for r: Array in res.route:
+		route.append([r[0] + d.x, r[1] + d.y])
+	if id == "start":
+		lv.route = route
+	elif at_end and not lv.route.is_empty():
+		lv.route.append_array(route)
+	if res.end.is_empty():
+		lv.erase("track_end")
+	else:
+		lv.track_end = [res.end[0] + d.x, res.end[1] + d.y, res.end[2], res.end[3]]
+	mark_edited()
+	_full_rebuild()
+	level_changed.emit()
+	ui.on_tool_changed()
+	ui.toast("Added: %s" % TrackPieces.label_of(id))
+	if not track_end().is_empty():
+		var c := TrackPieces.end_center(track_end())
+		keep_in_view(Vector3((c.x + 0.5) * TILE, 0.0, (c.y + 0.5) * TILE))
+	return true
+
+
+## Sets where the next section attaches (Road ends, or picking a spot).
+func set_track_end(origin: Vector2i, h: int, t: int) -> void:
+	lv.track_end = [origin.x, origin.y, h, clampi(t, 0, 9)]
+
+
+func _road_tile(fwd: int, lat: int) -> Vector2i:
+	return TrackPieces.F[_road_heading] * fwd + TrackPieces.L[_road_heading] * lat
+
+
+## After a Road stroke: meet other ground (open its wall, ramp to its height),
+## add rails, and leave an open end for sections.
+func _finish_road() -> void:
+	if _road_tiles.is_empty() or _road_square.is_empty():
+		return
+	var f: Vector2i = TrackPieces.F[_road_heading]
+	var l: Vector2i = TrackPieces.L[_road_heading]
+	var front := -1000000
+	var latmin := 1000000
+	var latmax := -1000000
+	for p in _road_square:
+		front = maxi(front, p.x * f.x + p.y * f.y)
+		latmin = mini(latmin, p.x * l.x + p.y * l.y)
+		latmax = maxi(latmax, p.x * l.x + p.y * l.y)
+	var t := _road_tier
+	var lc := (latmin + latmax) / 2
+	var p1 := _road_tile(front + 1, lc)
+	var p2 := _road_tile(front + 2, lc)
+	var c1 := hchar(p1.x, p1.y)
+	var c2 := hchar(p2.x, p2.y)
+	var joined := false
+	var ramp_top := t
+	if c1.is_valid_int() and not _road_tiles.has(p1):
+		var u := int(c1)
+		# A rail in the way: open it up to the ground behind it.
+		if c2.is_valid_int() and u == int(c2) + 1:
+			u = int(c2)
+			for lat in range(latmin, latmax + 1):
+				var q := _road_tile(front + 1, lat)
+				if hchar(q.x, q.y).is_valid_int():
+					set_h(q.x, q.y, str(u))
+		joined = true
+		if u != t:
+			# Ramp over the last columns of the road, rising towards the higher side.
+			var k := clampi(absi(u - t) * 2, 2, 8)
+			var ch: String = TrackPieces.RISE[_road_heading] if u > t else TrackPieces.RISE[(_road_heading + 2) % 4]
+			for a in range(front - k + 1, front + 1):
+				for lat in range(latmin, latmax + 1):
+					var q := _road_tile(a, lat)
+					if _road_tiles.has(q):
+						set_h(q.x, q.y, ch)
+			ramp_top = maxi(u, t)
+			ui.toast("Joined up with a ramp %s %d step%s" % ["up" if u > t else "down", absi(u - t), "" if absi(u - t) == 1 else "s"])
+		else:
+			ui.toast("Joined up")
+	if road_rails:
+		# Grow the map once so every rail fits (resize() moves _road_tiles along).
+		var lo := Vector2i(1000000, 1000000)
+		var hi := -lo
+		for p: Vector2i in _road_tiles:
+			lo = lo.min(p)
+			hi = hi.max(p)
+		var s0 := _shift
+		ensure_tile(lo.x - 1, lo.y - 1)
+		var d0 := _shift - s0
+		ensure_tile(hi.x + 1 + d0.x, hi.y + 1 + d0.y)
+		for p: Vector2i in _road_tiles:
+			var rail := mini(9, (ramp_top if not hchar(p.x, p.y).is_valid_int() else t) + 1)
+			for dj in [-1, 0, 1]:
+				for di in [-1, 0, 1]:
+					var n: Vector2i = p + Vector2i(di, dj)
+					if not _road_tiles.has(n) and not is_ground(n.x, n.y):
+						set_h(n.x, n.y, str(rail))
+		# front / lateral numbers moved with the map too.
+		var dd := _shift - s0
+		front += dd.x * f.x + dd.y * f.y
+		latmin += dd.x * l.x + dd.y * l.y
+	if not joined and road_width >= 2:
+		set_track_end(f * (front + 1) + l * (latmin - 1), _road_heading, t)
+	_road_tiles = {}
+	_road_square = []
+
+
+# --- guide -----------------------------------------------------------------------
+
+## Tiles the marble can roll to from the start (following jumps and the path).
+func _compute_reach() -> void:
+	reach = {}
+	if built == null or not has_char("S"):
+		return
+	var start := built.tile_at(built.spawn.x, built.spawn.y)
+	var jumps := {}
+	for e in built.extras:
+		if e.has("target_tile"):
+			var a0 := Vector2i(Vector2(e.tile).round())
+			if not jumps.has(a0):
+				jumps[a0] = []
+			jumps[a0].append(Vector2i(Vector2(e.target_tile).round()))
+	# Path points join too (sections with jumps and loops add them).
+	for k in range(1, lv.route.size()):
+		var a := Vector2i(Vector2(lv.route[k - 1][0], lv.route[k - 1][1]).round())
+		var b := Vector2i(Vector2(lv.route[k][0], lv.route[k][1]).round())
+		if a != b:
+			if not jumps.has(a):
+				jumps[a] = []
+			jumps[a].append(b)
+	reach[start] = true
+	var queue: Array[Vector2i] = [start]
+	var count := 0
+	while not queue.is_empty() and count < 60000:
+		var a: Vector2i = queue.pop_back()
+		count += 1
+		var jumped: Array = jumps.get(a, [])
+		var nexts: Array = [a + Vector2i.RIGHT, a + Vector2i.LEFT, a + Vector2i.DOWN, a + Vector2i.UP]
+		nexts.append_array(jumped)
+		for b: Vector2i in nexts:
+			if reach.has(b) or not built.is_tile_ground(b.x, b.y):
+				continue
+			if b not in jumped and not CustomLevel._can_step(built, a, b):
+				continue
+			reach[b] = true
+			queue.append(b)
+
+
+func hole_reachable() -> bool:
+	if built == null or built.goal == Vector2.INF:
+		return false
+	return reach.has(built.tile_at(built.goal.x, built.goal.y))
+
+
+## Reachable tile nearest the hole (where the track needs connecting).
+func gap_tile() -> Vector2i:
+	var g := built.tile_at(built.goal.x, built.goal.y)
+	var best := Vector2i(-1, -1)
+	var best_d := INF
+	for t: Vector2i in reach:
+		var d := Vector2(t - g).length()
+		if d < best_d:
+			best_d = d
+			best = t
+	return best
+
+
+## The next thing to do: [text, button label, action id].
+func guide() -> Array:
+	if not has_char("S"):
+		return ["Start with Sections > Start pad and click on the map, or place a Start with the Start tool.",
+			"Start pad", "start"]
+	if not has_char("G"):
+		if not track_end().is_empty():
+			return ["Build your track: click pieces in the Pieces tab to add them at the green arrow. End with Finish.",
+				"Add Finish", "finish"]
+		return ["Add a hole: Sections > Finish, or the Hole tool.", "Hole tool", "goal"]
+	if not hole_reachable():
+		return ["The marble can't roll from the start to the hole yet. Draw a Road from the orange ring to the hole's ground, or add sections.",
+			"Road tool", "road"]
+	var length := 0.0
+	for k in range(1, built.route.size()):
+		length += (built.route[k] - built.route[k - 1]).length()
+	if length > 45.0 and not has_char("C") and not has_char("K"):
+		return ["Long level: put a checkpoint gate about halfway, so a fall doesn't send players back to the start.",
+			"Gate tool", "checkpoint"]
+	var guess := estimate_par()
+	if absf(lv.par - guess) > maxf(15.0, guess * 0.6):
+		return ["Par time is %.0f s, the track looks more like %.0f s. Set a fair par so medals mean something." % [lv.par, guess],
+			"Use %.0f s" % guess, "par"]
+	if not tested:
+		return ["Try it! Test play shows if it's fun. Esc brings you back.", "Test play", "test"]
+	return ["Looks ready. Share it from the Quest tab, or keep adding sections.", "Quest tab", "share"]
+
+
+func guide_action(action: String) -> void:
+	match action:
+		"start", "finish":
+			if action == "start" or track_end().is_empty():
+				section_id = action
+				set_tool("sections")
+				ui.toast("Click on the map where the %s should go" % TrackPieces.label_of(action).to_lower())
+			else:
+				add_section(action)
+		"par":
+			set_level_value("par", estimate_par())
+			level_changed.emit()
+		"test":
+			test_play()
+		"share":
+			ui.show_tab(3)
+		_:
+			set_tool(action)
+
+
+# --- templates --------------------------------------------------------------------
+
+## A fresh level: "track" = empty sky with a start pad and an open end,
+## "island" = the classic open platform, "empty" = nothing.
+static func template(kind: String, level_title: String) -> Dictionary:
+	var d := CustomLevel.blank(level_title)
+	if kind == "island":
+		return d
+	var w := 14 if kind == "track" else 16
+	var h := 8 if kind == "track" else 10
+	d.heights = []
+	d.objects = []
+	for j in h:
+		d.heights.append(".".repeat(w))
+		d.objects.append(".".repeat(w))
+	if kind == "track":
+		var res := TrackPieces.stamp(TrackPieces.get_piece("start"), Vector2i(1, 1), 0, 2)
+		for c: Vector2i in res.cells:
+			var v: Array = res.cells[c]
+			var hl: String = d.heights[c.y]
+			d.heights[c.y] = hl.substr(0, c.x) + v[0] + hl.substr(c.x + 1)
+			if v[1] != ".":
+				var ol: String = d.objects[c.y]
+				d.objects[c.y] = ol.substr(0, c.x) + v[1] + ol.substr(c.x + 1)
+		d.route = res.route
+		d.track_end = res.end
+	return d
+
+
 # --- test play --------------------------------------------------------------------
 
 func test_play() -> void:
@@ -1023,6 +1410,7 @@ func test_play() -> void:
 	session_quest = quest
 	session_level = li
 	session_view = {target = cam_target, size = cam_size, yaw = cam_yaw, top = top_view}
+	session_tested = true
 	MainGame.quest = quest.duplicate_quest()
 	MainGame.test_mode = true
 	MainGame.requested_level = li
@@ -1072,9 +1460,13 @@ func _rebuild() -> void:
 			_build_chunk(k)
 		if not (_stroke and heights_only):
 			_rebuild_entities()
+		if not _stroke:
+			_compute_reach()
 		_draw_grid()
 		_draw_marks()
 		_update_hover()
+		if not _stroke:
+			rebuilt.emit()
 		return
 	_stroke_dirty = {}
 	if world:
@@ -1093,9 +1485,11 @@ func _rebuild() -> void:
 	_update_backdrop()
 	_ents = null
 	_rebuild_entities()
+	_compute_reach()
 	_draw_grid()
 	_draw_marks()
 	_update_hover()
+	rebuilt.emit()
 
 
 func _update_backdrop() -> void:
@@ -1163,6 +1557,11 @@ func set_animate(on: bool) -> void:
 func set_scenery(on: bool) -> void:
 	show_scenery = on
 	_full_rebuild()
+
+
+func set_reach(on: bool) -> void:
+	show_reach = on
+	_draw_marks()
 
 
 func set_grid(on: bool) -> void:
@@ -1310,6 +1709,117 @@ func _draw_marks() -> void:
 		sp = built.tile_center(selection.tile.x, selection.tile.y)
 	if sp != Vector2.INF:
 		_mark_ring(_ground3(sp), 1.25, Color("#35B37E"), true)
+	_draw_track_end()
+	_draw_reach()
+
+
+## Big green arrow where the next section attaches.
+func _draw_track_end() -> void:
+	var te := track_end()
+	if te.is_empty():
+		return
+	var c := TrackPieces.end_center(te)
+	var base := Vector3((c.x + 0.5) * TILE, te[3] * LevelBase.TIER + 0.35, (c.y + 0.5) * TILE)
+	var f: Vector2i = TrackPieces.F[te[2]]
+	var l: Vector2i = TrackPieces.L[te[2]]
+	var fwd := Vector3(f.x, 0, f.y)
+	var side := Vector3(l.x, 0, l.y)
+	var im := ImmediateMesh.new()
+	im.surface_begin(Mesh.PRIMITIVE_TRIANGLES, _line_material(Color.WHITE, true))
+	var col := Color("#35B37E")
+	var tip := base + fwd * 3.2
+	var pts := [
+		base + fwd * 0.8 - side * 2.0, tip, base + fwd * 0.8 + side * 2.0,
+		base - fwd * 1.2 - side * 0.8, base + fwd * 0.8 - side * 0.8, base + fwd * 0.8 + side * 0.8,
+		base - fwd * 1.2 - side * 0.8, base + fwd * 0.8 + side * 0.8, base - fwd * 1.2 + side * 0.8,
+	]
+	for p: Vector3 in pts:
+		im.surface_set_color(col)
+		im.surface_add_vertex(p)
+	im.surface_end()
+	var mi := MeshInstance3D.new()
+	mi.mesh = im
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_marks.add_child(mi)
+	var label := Label3D.new()
+	label.text = "next section"
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test = true
+	label.font_size = 56
+	label.pixel_size = 0.012
+	CandyText.style_3d(label, Palette.MINT)
+	label.fixed_size = true
+	label.pixel_size = 0.0014
+	label.position = base + Vector3.UP * 1.6
+	_marks.add_child(label)
+
+
+## Pink shading on ground the marble can't reach, and an orange ring on the
+## reachable spot nearest the hole when they aren't connected.
+func _draw_reach() -> void:
+	if not show_reach or not has_char("S") or reach.is_empty():
+		return
+	var im := ImmediateMesh.new()
+	var any := false
+	im.surface_begin(Mesh.PRIMITIVE_TRIANGLES, _line_material(Color.WHITE))
+	var col := Color(Palette.RASPBERRY, 0.3)
+	for j in rows():
+		for i in cols():
+			var t := Vector2i(i, j)
+			if reach.has(t) or not is_ground(i, j):
+				continue
+			# Walls next to reachable ground are fine, they're meant to stop you.
+			var wall := false
+			for n in [Vector2i.RIGHT, Vector2i.LEFT, Vector2i.DOWN, Vector2i.UP]:
+				if reach.has(t + n):
+					wall = true
+					break
+			if wall:
+				continue
+			var c := built.tile_center(i, j)
+			var y := built.surface(i, j, c.x, c.y) + 0.07
+			var x0 := i * TILE
+			var z0 := j * TILE
+			for p in [Vector3(x0, y, z0), Vector3(x0 + TILE, y, z0), Vector3(x0 + TILE, y, z0 + TILE),
+					Vector3(x0, y, z0), Vector3(x0 + TILE, y, z0 + TILE), Vector3(x0, y, z0 + TILE)]:
+				im.surface_set_color(col)
+				im.surface_add_vertex(p)
+			any = true
+	if any:
+		im.surface_end()
+		var mi := MeshInstance3D.new()
+		mi.mesh = im
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_marks.add_child(mi)
+	if has_char("G") and not hole_reachable():
+		var g := gap_tile()
+		if g.x < 0:
+			return
+		var at := _ground3(built.tile_center(g.x, g.y))
+		_mark_ring(at, 1.1, Palette.CORAL)
+		var label := Label3D.new()
+		label.text = "connect from here"
+		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		label.no_depth_test = true
+		label.font_size = 48
+		label.pixel_size = 0.012
+		CandyText.style_3d(label, Palette.CORAL)
+		label.fixed_size = true
+		label.pixel_size = 0.0014
+		label.position = at + Vector3.UP * 1.5
+		_marks.add_child(label)
+		var goal3 := _ground3(built.goal)
+		var line := ImmediateMesh.new()
+		line.surface_begin(Mesh.PRIMITIVE_LINES, _line_material(Color.WHITE, true))
+		var n := int(at.distance_to(goal3) / 0.8)
+		for k in range(0, n, 2):
+			for u in [float(k) / n, float(k + 1) / n]:
+				line.surface_set_color(Palette.CORAL)
+				line.surface_add_vertex(at.lerp(goal3, u) + Vector3.UP * 0.4)
+		line.surface_end()
+		var lm := MeshInstance3D.new()
+		lm.mesh = line
+		_marks.add_child(lm)
 
 
 func _mark_ring(at: Vector3, radius: float, col: Color, pulse: bool = false) -> void:
@@ -1333,8 +1843,13 @@ func _ground3(p: Vector2) -> Vector3:
 
 
 func _update_hover() -> void:
+	_ghost_mesh.visible = false
 	if not _hover_valid or built == null:
 		_hover_mesh.visible = false
+		return
+	if tool == "sections":
+		_hover_mesh.visible = false
+		_draw_ghost()
 		return
 	var tiles: Array[Vector2i] = []
 	if tool == "box" and _stroke:
@@ -1376,6 +1891,38 @@ func _update_hover() -> void:
 	_hover_mesh.visible = true
 
 
+## See-through preview of the picked section under the mouse.
+func _draw_ghost() -> void:
+	var piece := TrackPieces.get_piece(section_id)
+	if piece.is_empty():
+		return
+	var res := TrackPieces.stamp(piece, _section_origin(_hover, section_heading), section_heading, _section_tier(_hover))
+	var im := ImmediateMesh.new()
+	im.surface_begin(Mesh.PRIMITIVE_TRIANGLES, _line_material(Color.WHITE, true))
+	for c: Vector2i in res.cells:
+		var v: Array = res.cells[c]
+		if v[0] == ".":
+			continue
+		var y: float = (int(v[0]) if v[0].is_valid_int() else res.end[3] if not res.end.is_empty() else tier) * LevelBase.TIER + 0.1
+		var col := Color(Palette.MINT, 0.55)
+		if not res.ok:
+			col = Color(Palette.RASPBERRY, 0.5)
+		elif is_ground(c.x, c.y):
+			col = Color(Palette.CORAL, 0.5)
+		if v[1] in ["S", "G"]:
+			col = Color(Palette.LEMON, 0.8)
+		var x0 := c.x * TILE + 0.06
+		var z0 := c.y * TILE + 0.06
+		var x1 := x0 + TILE - 0.12
+		var z1 := z0 + TILE - 0.12
+		for p in [Vector3(x0, y, z0), Vector3(x1, y, z0), Vector3(x1, y, z1), Vector3(x0, y, z0), Vector3(x1, y, z1), Vector3(x0, y, z1)]:
+			im.surface_set_color(col)
+			im.surface_add_vertex(p)
+	im.surface_end()
+	_ghost_mesh.mesh = im
+	_ghost_mesh.visible = true
+
+
 # --- camera -----------------------------------------------------------------------
 
 func frame_level() -> void:
@@ -1385,6 +1932,18 @@ func frame_level() -> void:
 	var vp := get_viewport().get_visible_rect().size
 	var aspect := (vp.x - 700.0) / maxf(vp.y - 120.0, 1.0)
 	cam_size = clampf(maxf(h, w / maxf(aspect, 0.5)) * 1.15 * vp.y / maxf(vp.y - 120.0, 1.0), 12.0, 320.0)
+	_apply_camera()
+
+
+## Pans so `p` is inside the free area between the panels.
+func keep_in_view(p: Vector3) -> void:
+	var vp := get_viewport().get_visible_rect().size
+	var area := Rect2(EditorUI.LEFT_W + 60, EditorUI.TOP_H + 60, vp.x - EditorUI.LEFT_W - EditorUI.RIGHT_W - 120,
+		vp.y - EditorUI.TOP_H - EditorUI.BOTTOM_H - 200)
+	if area.has_point(camera.unproject_position(p)):
+		return
+	var t := Vector3(p.x, 0.0, p.z)
+	cam_target = cam_target.lerp(t, 0.6)
 	_apply_camera()
 
 

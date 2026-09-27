@@ -35,7 +35,16 @@ var _refreshing := false
 var _delete_armed := false
 var _level_list: ItemList
 var _file_dialog: FileDialog
+var _guide: PanelContainer
+var _guide_label: Label
+var _guide_button: Button
+var _guide_action := ""
+var _guide_hidden := false
+var _new_menu: PopupMenu
 var _size_caption: Label
+var _tool_name: Label
+var _pieces_note: Label
+var _piece_buttons := {}
 var _probs_box: VBoxContainer
 
 
@@ -47,17 +56,20 @@ func _ready() -> void:
 	_build_tools()
 	_build_right()
 	_build_status()
+	_build_guide()
 	_build_toast()
 	_build_help()
 	ed.selection_changed.connect(refresh_inspector)
 	ed.level_changed.connect(refresh_level)
 	ed.map_changed.connect(refresh_map_info)
+	ed.rebuilt.connect(refresh_guide)
 	ed.quest_changed.connect(refresh_quest)
 	refresh_quest()
 	refresh_level()
 	refresh_inspector()
 	on_tool_changed()
 	on_view_changed()
+	refresh_guide()
 
 
 # --- layout ----------------------------------------------------------------------
@@ -113,6 +125,12 @@ func _build_top_bar() -> void:
 	_grid_button.toggle_mode = true
 	_grid_button.theme_type_variation = "ToolButton"
 	row.add_child(_grid_button)
+	var reach := _btn("Reach", func() -> void: pass, "Shade ground the marble can't roll to from the start, and point at the gap")
+	reach.toggle_mode = true
+	reach.button_pressed = ed.show_reach
+	reach.theme_type_variation = "ToolButton"
+	reach.toggled.connect(ed.set_reach)
+	row.add_child(reach)
 	var anim := _btn("Animate", func() -> void: pass, "Let the monsters and toys move in the preview")
 	anim.toggle_mode = true
 	anim.theme_type_variation = "ToolButton"
@@ -139,37 +157,47 @@ func _build_tools() -> void:
 	p.offset_right = 8 + LEFT_W
 	p.anchor_bottom = 1.0
 	p.offset_bottom = -BOTTOM_H - 12
-	var scroll := ScrollContainer.new()
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	p.add_child(scroll)
 	var box := VBoxContainer.new()
-	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	box.add_theme_constant_override("separation", 4)
-	scroll.add_child(box)
+	box.add_theme_constant_override("separation", 2)
+	p.add_child(box)
 	var group := ""
 	var grid: GridContainer
 	for t: Array in LevelEditor.TOOLS:
 		if t[2] != group:
 			group = t[2]
-			var cap := CandyTheme.caption(group.to_upper(), 16)
-			box.add_child(cap)
+			box.add_child(CandyTheme.caption(group.to_upper(), 14))
 			grid = GridContainer.new()
-			grid.columns = 3
-			grid.add_theme_constant_override("h_separation", 5)
-			grid.add_theme_constant_override("v_separation", 5)
+			grid.columns = 5
+			grid.add_theme_constant_override("h_separation", 4)
+			grid.add_theme_constant_override("v_separation", 4)
 			box.add_child(grid)
-		var b := _btn(t[1], func() -> void: ed.set_tool(t[0]), t[3])
+		var b := _btn("", func() -> void: ed.set_tool(t[0]), "%s\n%s" % [t[1], t[3]])
 		b.toggle_mode = true
 		b.button_group = _tool_group
-		b.theme_type_variation = "ToolButton"
-		b.custom_minimum_size = Vector2(88, 34)
-		b.add_theme_font_size_override("font_size", 17)
+		b.theme_type_variation = "IconButton"
+		b.icon = _icon("tool_" + t[0])
+		b.expand_icon = true
+		b.custom_minimum_size = Vector2(50, 50)
 		grid.add_child(b)
 		_tool_buttons[t[0]] = b
 	box.add_child(HSeparator.new())
+	_tool_name = Label.new()
+	_tool_name.add_theme_font_override("font", CandyText.FONT_BOLD)
+	_tool_name.add_theme_font_size_override("font_size", 22)
+	box.add_child(_tool_name)
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_child(scroll)
 	_options = VBoxContainer.new()
+	_options.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_options.add_theme_constant_override("separation", 6)
-	box.add_child(_options)
+	scroll.add_child(_options)
+
+
+func _icon(icon_name: String) -> Texture2D:
+	var path := "res://art/ui/icons/%s.png" % icon_name
+	return load(path) if ResourceLoader.exists(path) else null
 
 
 func _build_right() -> void:
@@ -183,7 +211,7 @@ func _build_right() -> void:
 	p.offset_bottom = -BOTTOM_H - 12
 	_tabs = TabContainer.new()
 	p.add_child(_tabs)
-	for tab_name in ["Selected", "Level", "Quest"]:
+	for tab_name in ["Pieces", "Selected", "Level", "Quest"]:
 		var scroll := ScrollContainer.new()
 		scroll.name = tab_name
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -193,10 +221,11 @@ func _build_right() -> void:
 		box.add_theme_constant_override("separation", 7)
 		scroll.add_child(box)
 		match tab_name:
+			"Pieces": _build_pieces(box)
 			"Selected": _inspector = box
 			"Level": _level_box = box
 			"Quest": _quest_box = box
-	_tabs.current_tab = 1
+	_tabs.current_tab = 0
 	_tabs.get_tab_bar().focus_mode = Control.FOCUS_NONE
 
 
@@ -314,7 +343,72 @@ func _build_help() -> void:
 	box.add_child(close)
 
 
+## Next-step card above the status line.
+func _build_guide() -> void:
+	var c := CenterContainer.new()
+	c.anchor_top = 1.0
+	c.anchor_bottom = 1.0
+	c.anchor_right = 1.0
+	c.offset_left = LEFT_W + 16
+	c.offset_right = -RIGHT_W - 16
+	c.offset_top = -BOTTOM_H - 96
+	c.offset_bottom = -BOTTOM_H - 14
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(c)
+	_guide = PanelContainer.new()
+	var sb: StyleBoxFlat = CandyTheme._box(Color("#FFF4E0"), Color("#35B37E"), 3, 16)
+	sb.content_margin_left = 14
+	sb.content_margin_right = 10
+	sb.content_margin_top = 6
+	sb.content_margin_bottom = 6
+	sb.shadow_color = Color(0.2, 0.3, 0.2, 0.25)
+	sb.shadow_size = 6
+	_guide.add_theme_stylebox_override("panel", sb)
+	c.add_child(_guide)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	_guide.add_child(row)
+	var tag := Label.new()
+	tag.text = "NEXT"
+	tag.add_theme_font_override("font", CandyText.FONT_BOLD)
+	tag.add_theme_color_override("font_color", Color("#35B37E"))
+	tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(tag)
+	_guide_label = Label.new()
+	_guide_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_guide_label.custom_minimum_size.x = 440
+	_guide_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_guide_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(_guide_label)
+	_guide_button = _btn("", func() -> void: ed.guide_action(_guide_action))
+	_guide_button.add_theme_stylebox_override("normal", _colored(_guide_button, Palette.MINT))
+	_guide_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(_guide_button)
+	var close := _btn("x", func() -> void:
+		_guide_hidden = true
+		_guide.visible = false, "Hide the guide (Help shows it again)")
+	close.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(close)
+
+
+func refresh_guide() -> void:
+	if _guide == null or ed.built == null:
+		return
+	var g := ed.guide()
+	_guide_label.text = g[0]
+	_guide_button.text = g[1]
+	_guide_action = g[2]
+	_guide.visible = not _guide_hidden
+
+
+func show_tab(i: int) -> void:
+	_tabs.current_tab = i
+
+
 func toggle_help() -> void:
+	if _help.visible:
+		_guide_hidden = false
+		refresh_guide()
 	_help.visible = not _help.visible
 
 
@@ -457,12 +551,36 @@ func on_tool_changed() -> void:
 	_hint.text = ed.tool_hint()
 	_clear(_options)
 	var t := ed.tool
-	var head := CandyTheme.caption("OPTIONS", 16)
-	_options.add_child(head)
+	for tt: Array in LevelEditor.TOOLS:
+		if tt[0] == t:
+			_tool_name.text = tt[1]
+	_refresh_pieces()
 	var info := _label(ed.tool_hint(), true)
 	info.add_theme_font_size_override("font_size", 17)
 	_options.add_child(info)
-	if t in ["paint", "box", "fill"]:
+	if t == "sections":
+		_tabs.current_tab = 0
+	if t == "road":
+		_options.add_child(CandyTheme.caption("Lane width"))
+		var wr := HBoxContainer.new()
+		_options.add_child(wr)
+		for k in [2, 3, 4, 5, 6]:
+			var b := _btn(str(k), func() -> void:
+				ed.road_width = k
+				on_tool_changed())
+			b.toggle_mode = true
+			b.theme_type_variation = "ToolButton"
+			b.button_pressed = ed.road_width == k
+			b.custom_minimum_size.x = 44
+			wr.add_child(b)
+		var rails := CheckBox.new()
+		rails.text = "Rails along the sides"
+		rails.focus_mode = Control.FOCUS_NONE
+		rails.button_pressed = ed.road_rails
+		rails.toggled.connect(func(on: bool) -> void: ed.road_rails = on)
+		_options.add_child(rails)
+		_options.add_child(_label("Start on ground to keep its height, or on void to use the height below. Drag into other ground to join it: walls open and a ramp is added if the heights differ. Sections continue from where the road ends.", true))
+	if t in ["paint", "box", "fill", "road"]:
 		_options.add_child(CandyTheme.caption("Height  (keys 0-9)"))
 		var g := GridContainer.new()
 		g.columns = 5
@@ -554,6 +672,46 @@ func on_tool_changed() -> void:
 		_options.add_child(_label("After placing, the Selected tab has its speed and colour. The Level tab changes all monsters at once.", true))
 
 
+## Pieces tab: thumbnails of every ready-made section.
+func _build_pieces(box: VBoxContainer) -> void:
+	_pieces_note = _label("", true)
+	_pieces_note.add_theme_font_size_override("font_size", 17)
+	box.add_child(_pieces_note)
+	var g := GridContainer.new()
+	g.columns = 4
+	g.add_theme_constant_override("h_separation", 4)
+	g.add_theme_constant_override("v_separation", 4)
+	box.add_child(g)
+	for p: Array in TrackPieces.LIST:
+		var b := _btn(p[1], func() -> void:
+			ed.add_section(p[0])
+			on_tool_changed(), "%s\n%s" % [p[1], p[3]])
+		b.toggle_mode = true
+		b.theme_type_variation = "IconButton"
+		b.icon = _icon("piece_" + p[0])
+		b.expand_icon = true
+		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		b.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
+		b.custom_minimum_size = Vector2(84, 80)
+		b.clip_text = true
+		b.add_theme_font_size_override("font_size", 13)
+		g.add_child(b)
+		_piece_buttons[p[0]] = b
+
+
+func _refresh_pieces() -> void:
+	if _pieces_note == null:
+		return
+	var has_end := not ed.track_end().is_empty()
+	var dirs := ["right", "down", "left", "up"]
+	_pieces_note.text = ("Click a piece to add it at the green arrow." if has_end
+		else "No open track end: pick a piece, then click the map to put it down.") \
+		+ "  Clicking the map places the picked piece there, facing %s (R turns)." % dirs[ed.section_heading]
+	_pieces_note.add_theme_color_override("font_color", Color("#2E8B62") if has_end else Palette.CORAL)
+	for id: String in _piece_buttons:
+		(_piece_buttons[id] as Button).set_pressed_no_signal(ed.tool == "sections" and ed.section_id == id)
+
+
 func on_view_changed() -> void:
 	_view_button.text = "Flat map" if not ed.top_view else "3D view"
 	_grid_button.set_pressed_no_signal(ed.show_grid)
@@ -589,10 +747,10 @@ func refresh_inspector() -> void:
 		_inspector.add_child(_label("Pick the Select tool and click something on the map, or place something new. Its settings show up here: speed, colour, direction and more.", true))
 		return
 	if not e.is_empty():
-		_tabs.current_tab = 0
+		_tabs.current_tab = 1
 		_inspector_extra(e)
 	else:
-		_tabs.current_tab = 0
+		_tabs.current_tab = 1
 		_inspector_char(ch)
 
 
@@ -846,7 +1004,18 @@ func refresh_quest() -> void:
 	g.add_theme_constant_override("h_separation", 5)
 	g.add_theme_constant_override("v_separation", 5)
 	_quest_box.add_child(g)
-	g.add_child(_btn("New level", _add_level))
+	var nl := _btn("New level", func() -> void: pass, "Pick how the new level starts")
+	nl.pressed.connect(func() -> void:
+		_new_menu.position = Vector2i(nl.get_screen_position() + Vector2(0, nl.size.y))
+		_new_menu.popup())
+	g.add_child(nl)
+	if _new_menu == null:
+		_new_menu = PopupMenu.new()
+		_new_menu.add_item("Guided track (start pad + sections)", 0)
+		_new_menu.add_item("Open island", 1)
+		_new_menu.add_item("Empty sky", 2)
+		_new_menu.id_pressed.connect(func(id: int) -> void: _add_level(["track", "island", "empty"][id]))
+		add_child(_new_menu)
 	g.add_child(_btn("Copy", _copy_level, "Duplicate this level"))
 	var del := _btn("Delete", func() -> void: pass)
 	del.pressed.connect(func() -> void: _delete_level(del))
@@ -895,6 +1064,7 @@ func refresh_quest() -> void:
 	_quest_box.add_child(_btn("Start a new quest", func() -> void:
 		ed.quest.save()
 		var nq := Quest.create()
+		nq.levels = [LevelEditor.template("track", "Level 1")]
 		nq.author = ed.quest.author
 		nq.save()
 		ed.open_quest(nq)
@@ -914,11 +1084,11 @@ func _refresh_level_pick() -> void:
 		_level_list.set_item_text(ed.li, "%d.  %s%s" % [ed.li + 1, ed.lv.title, "   (race)" if ed.lv.race else ""])
 
 
-func _add_level() -> void:
+func _add_level(kind: String = "track") -> void:
 	if ed.quest.levels.size() >= Quest.MAX_LEVELS:
 		toast("A quest can have %d levels" % Quest.MAX_LEVELS)
 		return
-	ed.quest.levels.insert(ed.li + 1, CustomLevel.blank("Level %d" % (ed.quest.levels.size() + 1)))
+	ed.quest.levels.insert(ed.li + 1, LevelEditor.template(kind, "Level %d" % (ed.quest.levels.size() + 1)))
 	ed.unsaved = true
 	ed.open_level(ed.li + 1)
 	refresh_quest()

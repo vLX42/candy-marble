@@ -65,6 +65,19 @@ python3 tools/genlevels.py
 Title screen > **Level editor** (or Quests > Edit). Build levels in a live 3D
 preview that uses the same code as the game:
 
+- **Sections (easiest):** the Pieces tab has ready-made track pieces (start
+  pad, straights, turns, ramps, jumps, loop, bumper field, pinball table,
+  sweepers, stompers, finish and more, 29 in all). Clicking one adds it at the
+  green arrow at the open end of your track, at the right height, with its
+  path for the rival and camera. Clicking the map places the picked piece
+  there instead (R turns it).
+- **Road:** drag a railed lane from anywhere. It keeps the height where you
+  start, opens walls it runs into and adds a ramp when the ground it reaches
+  is higher or lower. Sections continue where a road ends.
+- **Guide:** a "next step" card says what to do and has a button for it. The
+  Reach overlay shades ground the marble can't get to and puts an orange ring
+  where the track needs connecting to the hole. New levels can start as a
+  guided track, an open island or empty sky.
 - **Ground:** paint heights 0-9 (painting past the edge grows the map), box
   with optional walls, raise, lower, ramps (auto slope, or a jump when a ramp
   runs into void), flood fill, erase, eyedropper.
@@ -99,6 +112,9 @@ Shared files are data only: every field is checked and clamped
 `quests/sweet_starter.json` (built by `tools/make_sample_quest.py`) is installed
 on first launch.
 
+Tool icons and piece thumbnails are rendered from the real models:
+`godot --always-on-top -s tools/make_icons.gd && godot --headless --import`.
+
 ## Models (Blender)
 
 All models are scripted, so they can be rebuilt and tweaked in code:
@@ -129,6 +145,7 @@ godot --headless --fixed-fps 120 -s tests/levels_test.gd   # bot plays every lev
 godot --headless --fixed-fps 120 -s tests/race_test.gd     # race win / 2nd place outcomes
 godot --headless --fixed-fps 120 -s tests/hazards_test.gd  # stomper, hopper, ghost, windmill, catapult
 godot --headless --fixed-fps 120 -s tests/editor_test.gd   # editor tools, undo, quests, share codes, sanitising
+godot --headless --fixed-fps 120 -s tests/sections_test.gd # sections, Road join-ups, guide steps
 godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --remix   # built-in levels after a trip through the quest format
 godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/sweet_starter.json
 godot --always-on-top -s tests/shots.gd                   # screenshots to tests/shots/

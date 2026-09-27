@@ -30,7 +30,7 @@ static func make(size: int = 38) -> Theme:
 	for type in ["Button", "OptionButton", "ColorPickerButton", "MenuButton"]:
 		t.set_stylebox("normal", type, normal)
 		t.set_stylebox("hover", type, hover)
-		t.set_stylebox("focus", type, hover if not small else StyleBoxEmpty.new())
+		t.set_stylebox("focus", type, StyleBoxEmpty.new() if small else hover)
 		t.set_stylebox("pressed", type, pressed)
 		t.set_stylebox("hover_pressed", type, pressed)
 		t.set_stylebox("disabled", type, disabled)
@@ -47,6 +47,18 @@ static func make(size: int = 38) -> Theme:
 	t.set_type_variation("ToolButton", "Button")
 	t.set_stylebox("pressed", "ToolButton", on)
 	t.set_stylebox("hover_pressed", "ToolButton", on)
+	# Square icon buttons (editor tools and pieces): tight margins.
+	t.set_type_variation("IconButton", "Button")
+	for st in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
+		var src: StyleBoxFlat = (on if st in ["pressed", "hover_pressed"] else t.get_stylebox(st, "Button")).duplicate()
+		src.content_margin_left = 3
+		src.content_margin_right = 3
+		src.content_margin_top = 3
+		src.content_margin_bottom = 3
+		src.set_corner_radius_all(10)
+		src.shadow_size = 2
+		t.set_stylebox(st, "IconButton", src)
+	t.set_stylebox("focus", "IconButton", StyleBoxEmpty.new())
 
 	var field := _box(Color(1, 1, 1, 0.92), Palette.LILAC, 2, 10)
 	field.content_margin_left = 10

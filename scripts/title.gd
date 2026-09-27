@@ -151,18 +151,18 @@ func _build_ui() -> void:
 	logo.texture = load("res://art/ui/logo.png")
 	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
-	logo.position = Vector2(40, 18)
-	logo.size = Vector2(620, 323)
+	logo.position = Vector2(46, 12)
+	logo.size = Vector2(520, 271)
 	root.add_child(logo)
 	var sub := Label.new()
 	sub.text = "a marble race through candyland"
-	CandyText.style(sub, 30)
-	sub.position = Vector2(92, 330)
+	CandyText.style(sub, 26)
+	sub.position = Vector2(92, 276)
 	root.add_child(sub)
 
 	_menu = VBoxContainer.new()
-	_menu.position = Vector2(84, 380)
-	_menu.add_theme_constant_override("separation", 14)
+	_menu.position = Vector2(84, 336)
+	_menu.add_theme_constant_override("separation", 12)
 	root.add_child(_menu)
 	var unlocked := mini(_scores.unlocked(), MainGame.LEVELS.size())
 	var play := _button("Play", func() -> void: _start(0))
@@ -173,15 +173,13 @@ func _build_ui() -> void:
 	else:
 		_menu.add_child(play)
 	_menu.add_child(_button("Levels", _show_levels))
-	_menu.add_child(_button("Quests", _show_quests))
-	_menu.add_child(_button("Level editor", _open_editor))
-	_menu.add_child(_button("Settings", _show_settings))
-	_menu.add_child(_button("Quit", func() -> void: get_tree().quit()))
+	_menu.add_child(_pair(_button("Quests", _show_quests), _button("Level editor", _open_editor)))
+	_menu.add_child(_pair(_button("Settings", _show_settings), _button("Quit", func() -> void: get_tree().quit())))
 	var runs: Array = _scores.top("run")
 	if runs.size() > 0:
 		var best := Label.new()
 		best.text = "Best full run  %.2f s" % runs[0]
-		CandyText.style(best, 26)
+		CandyText.style(best, 24)
 		_menu.add_child(best)
 	_update_fullscreen_label()
 
@@ -232,15 +230,31 @@ func _build_ui() -> void:
 
 
 func _setup_theme() -> void:
-	_theme = CandyTheme.make(38)
+	_theme = CandyTheme.make(32)
+
+
+## Two half-width buttons side by side.
+func _pair(a: Button, b: Button) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	for x in [a, b]:
+		x.custom_minimum_size = Vector2(0, 0)
+		x.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(x)
+	row.custom_minimum_size.x = 480
+	return row
 
 
 func _button(text: String, action: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	b.custom_minimum_size = Vector2(360, 0)
+	b.custom_minimum_size = Vector2(480, 0)
 	b.pressed.connect(action)
+	# Hovering moves the keyboard focus too, so only one button lights up.
+	b.mouse_entered.connect(func() -> void:
+		if not b.disabled:
+			b.grab_focus())
 	return b
 
 

@@ -225,6 +225,7 @@ func _edit(q: Quest) -> void:
 
 func _new_quest() -> void:
 	var q := Quest.create()
+	q.levels = [LevelEditor.template("track", "Level 1")]
 	q.save()
 	_edit(q)
 

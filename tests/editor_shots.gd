@@ -21,6 +21,33 @@ func _initialize() -> void:
 			load("res://scripts/editor/level_editor.gd").set("session_quest", sample)
 			load("res://scripts/editor/level_editor.gd").set("session_level", 1)
 			_swap(load("res://scenes/editor.tscn").instantiate())],
+		["guided", 1.5, func() -> void:
+			var g := Quest.create("Guided")
+			g.id = "testshots2"
+			g.levels = [load("res://scripts/editor/level_editor.gd").template("track", "My track")]
+			load("res://scripts/editor/level_editor.gd").set("session_quest", g)
+			load("res://scripts/editor/level_editor.gd").set("session_level", 0)
+			_swap(load("res://scenes/editor.tscn").instantiate())],
+		["guided_built", 1.5, func() -> void:
+			for id in ["straight", "ramp_up", "right", "bumpers", "left", "loop"]:
+				node.add_section(id)
+			node.frame_level()],
+		["gap", 1.5, func() -> void:
+			node.add_section("straight")
+			var x0: int = node.cols() + 3
+			node.tier = 0
+			node.box_walls = true
+			for pair in [["box", Vector2i(x0, 2), Vector2i(x0 + 6, 8)], ["goal", Vector2i(x0 + 3, 5), Vector2i(x0 + 3, 5)]]:
+				node.set_tool(pair[0])
+				node._stroke_begin(pair[1], Vector2(pair[1]) + Vector2(0.5, 0.5), false)
+				node._stroke_move(pair[2], Vector2(pair[2]) + Vector2(0.5, 0.5), false)
+				node._stroke_end(pair[2], Vector2(pair[2]) + Vector2(0.5, 0.5), false)
+			node.set_tool("road")
+			node.frame_level()],
+		["back_to_sample", 1.0, func() -> void:
+			load("res://scripts/editor/level_editor.gd").set("session_quest", sample)
+			load("res://scripts/editor/level_editor.gd").set("session_level", 1)
+			_swap(load("res://scenes/editor.tscn").instantiate())],
 		["selected", 0.8, func() -> void:
 			node.set_tool("select")
 			for k in node.lv.extras.size():
@@ -33,10 +60,10 @@ func _initialize() -> void:
 			node.toggle_view()
 			node.set_animate(false)
 			node.set_tool("ramp")
-			node.ui._tabs.current_tab = 1],
+			node.ui._tabs.current_tab = 2],
 		["quest", 0.6, func() -> void:
 			node.set_tool("paint")
-			node.ui._tabs.current_tab = 2],
+			node.ui._tabs.current_tab = 3],
 		["help", 0.6, func() -> void: node.ui.toggle_help()],
 		["remix", 1.5, func() -> void:
 			node.ui.toggle_help()

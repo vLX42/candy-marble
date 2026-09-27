@@ -182,6 +182,12 @@ static func sanitize(d: Variant) -> Dictionary:
 		if v.size() == 2:
 			route.append([clampf(v[0], -1.0, width), clampf(v[1], -1.0, hs.size())])
 	out.route = route
+	# Editor only: where the next track section attaches [x, z, heading, tier].
+	var te: Array = src.get("track_end") if src.get("track_end") is Array else []
+	var tv := _vec(te, 4)
+	if tv.size() == 4:
+		out.track_end = [clampi(int(tv[0]), -8, width + 8), clampi(int(tv[1]), -8, hs.size() + 8),
+			posmod(int(tv[2]), 4), clampi(int(tv[3]), 0, 9)]
 	return out
 
 
