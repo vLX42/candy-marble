@@ -74,7 +74,7 @@ var game_complete := false
 var _hud_level: Label
 var _hud_time: Label
 var _hud_best: Label
-var _hud_message: Label
+var _hud_message: RichTextLabel
 var _hud_board: Label
 var _hud_rush: ProgressBar
 var _hud_rush_label: Label
@@ -235,7 +235,7 @@ func _process(delta: float) -> void:
 		level_time += delta
 	_hud_time.text = "%.2f" % level_time
 	var over_par := level_time > level.time_limit
-	_hud_time.add_theme_color_override("font_color", Palette.RASPBERRY if over_par else Palette.INK)
+	_hud_time.add_theme_color_override("font_color", Palette.RASPBERRY if over_par else CandyText.PASTELS[0])
 	_hud_level.text = "Level %d  %s\nPar %.0f s   Falls %d" % [level_index + 1, level.title, level.time_limit, falls]
 	_update_rush(delta)
 	if rival:
@@ -439,11 +439,9 @@ func _popup(text: String, at: Vector3, col: Color, size: float = 1.0) -> void:
 	l.text = text
 	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	l.no_depth_test = true
-	l.font_size = int(64 * size)
-	l.outline_size = 16
-	l.modulate = col.lightened(0.1)
-	l.outline_modulate = Palette.INK
+	l.font_size = int(72 * size)
 	l.pixel_size = 0.01
+	CandyText.style_3d(l, col)
 	world.add_child(l)
 	l.global_position = at
 	var tw := l.create_tween().set_parallel()
@@ -492,12 +490,12 @@ func burst(pos: Vector3, colors: Array, amount: int, speed: float) -> void:
 func show_message(text: String, duration: float = 0.0) -> void:
 	_message_token += 1
 	var token := _message_token
-	_hud_message.text = text
+	_set_message(text)
 	if duration <= 0.0:
 		return
 	await get_tree().create_timer(duration).timeout
 	if token == _message_token:
-		_hud_message.text = _sticky_message
+		_set_message(_sticky_message)
 
 
 # --- Setup ------------------------------------------------------------------
@@ -615,10 +613,16 @@ func _setup_hud() -> void:
 	_hud_best.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	layer.add_child(_hud_best)
 
-	_hud_message = _label(44)
+	_hud_message = RichTextLabel.new()
+	_hud_message.bbcode_enabled = true
+	_hud_message.fit_content = true
+	_hud_message.scroll_active = false
+	_hud_message.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hud_message.anchor_right = 1.0
-	_hud_message.offset_top = 120.0
-	_hud_message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hud_message.offset_left = 40.0
+	_hud_message.offset_right = -40.0
+	_hud_message.offset_top = 110.0
+	CandyText.style(_hud_message, 52)
 	layer.add_child(_hud_message)
 
 	_hud_rush = ProgressBar.new()
@@ -661,8 +665,17 @@ func _setup_hud() -> void:
 
 func _label(font_size: int) -> Label:
 	var l := Label.new()
-	l.add_theme_font_size_override("font_size", font_size)
-	l.add_theme_color_override("font_color", Palette.INK)
-	l.add_theme_color_override("font_outline_color", Color.WHITE)
-	l.add_theme_constant_override("outline_size", 10)
+	CandyText.style(l, font_size)
 	return l
+
+
+## Big centre message: first line in candy letters, the rest in chocolate.
+func _set_message(text: String) -> void:
+	if text == "":
+		_hud_message.text = ""
+		return
+	var lines := text.split("\n")
+	var out := "[center]" + CandyText.rainbow(lines[0])
+	if lines.size() > 1:
+		out += "\n[font_size=30]" + "\n".join(lines.slice(1)) + "[/font_size]"
+	_hud_message.text = out + "[/center]"

@@ -36,7 +36,7 @@ func _process(delta: float) -> bool:
 				_next()
 		2:
 			if pt > 1.5:
-				var msg: String = main._hud_message.text
+				var msg: String = main._hud_message.get_parsed_text()
 				_check("player still finishes, in 2nd place", main.finished and msg.contains("2nd place"),
 					"finished=%s msg=%s" % [main.finished, msg.replace("\n", " | ")])
 				main.start_level(1)

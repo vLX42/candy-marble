@@ -137,28 +137,21 @@ func _build_ui() -> void:
 	root.theme = _theme
 	layer.add_child(root)
 
-	var logo := Label.new()
-	logo.text = "Candy Marble"
-	logo.add_theme_font_size_override("font_size", 104)
-	logo.add_theme_color_override("font_color", Palette.PINK.darkened(0.15))
-	logo.add_theme_color_override("font_outline_color", Color.WHITE)
-	logo.add_theme_constant_override("outline_size", 26)
-	logo.add_theme_color_override("font_shadow_color", Palette.RASPBERRY.darkened(0.2))
-	logo.add_theme_constant_override("shadow_offset_x", 0)
-	logo.add_theme_constant_override("shadow_offset_y", 8)
-	logo.position = Vector2(70, 60)
+	var logo := TextureRect.new()
+	logo.texture = load("res://art/ui/logo.png")
+	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
+	logo.position = Vector2(40, 18)
+	logo.size = Vector2(620, 323)
 	root.add_child(logo)
 	var sub := Label.new()
 	sub.text = "a marble race through candyland"
-	sub.add_theme_font_size_override("font_size", 30)
-	sub.add_theme_color_override("font_color", Palette.INK)
-	sub.add_theme_color_override("font_outline_color", Color.WHITE)
-	sub.add_theme_constant_override("outline_size", 10)
-	sub.position = Vector2(84, 196)
+	CandyText.style(sub, 30)
+	sub.position = Vector2(92, 330)
 	root.add_child(sub)
 
 	_menu = VBoxContainer.new()
-	_menu.position = Vector2(84, 290)
+	_menu.position = Vector2(84, 400)
 	_menu.add_theme_constant_override("separation", 14)
 	root.add_child(_menu)
 	var unlocked := mini(_scores.unlocked(), MainGame.LEVELS.size())
@@ -176,15 +169,12 @@ func _build_ui() -> void:
 	if runs.size() > 0:
 		var best := Label.new()
 		best.text = "Best full run  %.2f s" % runs[0]
-		best.add_theme_font_size_override("font_size", 24)
-		best.add_theme_color_override("font_color", Palette.INK)
-		best.add_theme_color_override("font_outline_color", Color.WHITE)
-		best.add_theme_constant_override("outline_size", 8)
+		CandyText.style(best, 26)
 		_menu.add_child(best)
 	_update_fullscreen_label()
 
 	_levels_panel = VBoxContainer.new()
-	_levels_panel.position = Vector2(84, 280)
+	_levels_panel.position = Vector2(84, 390)
 	_levels_panel.add_theme_constant_override("separation", 14)
 	_levels_panel.visible = false
 	root.add_child(_levels_panel)
@@ -213,10 +203,7 @@ func _build_ui() -> void:
 
 	var hint := Label.new()
 	hint.text = "WASD / arrows / stick to roll    R restart    Esc menu    F11 fullscreen"
-	hint.add_theme_font_size_override("font_size", 20)
-	hint.add_theme_color_override("font_color", Palette.INK)
-	hint.add_theme_color_override("font_outline_color", Color.WHITE)
-	hint.add_theme_constant_override("outline_size", 8)
+	CandyText.style(hint, 22, CandyText.CHOCOLATE, false)
 	hint.anchor_top = 1.0
 	hint.anchor_bottom = 1.0
 	hint.offset_left = 84
@@ -258,6 +245,11 @@ func _setup_theme() -> void:
 	_theme.set_color("font_focus_color", "Button", Palette.INK)
 	_theme.set_color("font_pressed_color", "Button", Palette.INK)
 	_theme.set_font_size("font_size", "Button", 38)
+	_theme.set_font("font", "Button", CandyText.FONT_BOLD)
+	_theme.set_color("font_color", "Button", CandyText.CHOCOLATE)
+	_theme.set_color("font_hover_color", "Button", CandyText.CHOCOLATE)
+	_theme.set_color("font_focus_color", "Button", CandyText.CHOCOLATE)
+	_theme.set_color("font_pressed_color", "Button", CandyText.CHOCOLATE)
 	var track := StyleBoxFlat.new()
 	track.bg_color = Color(1, 1, 1, 0.75)
 	track.set_corner_radius_all(10)
@@ -320,7 +312,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _build_settings(root: Control) -> void:
 	_settings_panel = VBoxContainer.new()
-	_settings_panel.position = Vector2(84, 270)
+	_settings_panel.position = Vector2(84, 380)
 	_settings_panel.add_theme_constant_override("separation", 10)
 	_settings_panel.visible = false
 	root.add_child(_settings_panel)
@@ -373,10 +365,7 @@ func _slider(title: String, value: float, on_change: Callable) -> Control:
 	var l := Label.new()
 	l.text = title
 	l.custom_minimum_size = Vector2(150, 0)
-	l.add_theme_font_size_override("font_size", 30)
-	l.add_theme_color_override("font_color", Palette.INK)
-	l.add_theme_color_override("font_outline_color", Color.WHITE)
-	l.add_theme_constant_override("outline_size", 8)
+	CandyText.style(l, 30)
 	row.add_child(l)
 	var s := HSlider.new()
 	s.min_value = 0.0

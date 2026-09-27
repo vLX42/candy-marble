@@ -91,3 +91,10 @@ drives the ball through each level's `route` with real input (it reads the
 sweepers' timing) and fails if a level can't be finished.
 
 Art direction and prompts: [art/STYLE.md](art/STYLE.md).
+
+## Credits
+
+- Font: [Fredoka](https://github.com/hafontia/Fredoka-One) by the Fredoka
+  Project Authors, SIL Open Font License 1.1 (`fonts/OFL.txt`).
+- Logo: `art/ui/logo.png`, cut out of `art/reference/08-logo-source.jpg` with
+  `tools/cut_logo.py` (run with Blender's Python, which ships numpy).
