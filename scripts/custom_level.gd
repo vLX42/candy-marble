@@ -35,6 +35,11 @@ const EXTRA_PARAMS := {
 	"redirect": {strength = [8.0, 4.0, 20.0, "Launch speed"]},
 	"hoop": {height = [2.2, 0.8, 9.0, "Height"]},
 	"spinner": {},
+	"flipper": {strength = [13.0, 6.0, 20.0, "Flip strength"]},
+	"switch": {open_time = [0.0, 0.0, 60.0, "Open seconds (0 = for good)"]},
+	"gate": {open_time = [0.0, 0.0, 60.0, "Open seconds (0 = for good)"], height = [1.3, 0.5, 3.0, "Height"],
+		y = [0.0, -2.0, 9.0, "Height of a bridge"]},
+	"secret": {},
 	"loop": {},
 	"chute": {y = [0.0, -2.0, 6.0, "Height"]},
 }
@@ -226,6 +231,19 @@ static func sanitize_extra(e: Variant, width: int, height: int) -> Dictionary:
 	var tint := _color_text(e.get("tint"), "")
 	if tint != "":
 		out.tint = tint
+	# Puzzle pieces: which switch opens which gate, the gate's footprint.
+	if type in ["switch", "gate"]:
+		var ch := ""
+		for c: String in str(e.get("channel", "a")).substr(0, 16):
+			if c in "abcdefghijklmnopqrstuvwxyz0123456789_":
+				ch += c
+		out.channel = ch if ch != "" else "a"
+	if type == "gate":
+		var sz := _vec(e.get("size"), 2)
+		out.size = [clampf(sz[0], 1.0, 12.0), clampf(sz[1], 1.0, 12.0)] if sz.size() == 2 else [1.0, 4.0]
+		out.bridge = e.get("bridge") is bool and e.bridge
+	if type == "cannon" and (e.get("hang") is float or e.get("hang") is int):
+		out.hang = clampf(float(e.hang), 0.0, 5.0)
 	return out
 
 
@@ -235,7 +253,7 @@ static func decode_extra(e: Dictionary) -> Dictionary:
 	for key: String in e:
 		var v: Variant = e[key]
 		match key:
-			"tile", "target_tile":
+			"tile", "target_tile", "size":
 				d[key] = Vector2(v[0], v[1])
 			"travel":
 				d[key] = Vector3(v[0], v[1], v[2])
@@ -276,7 +294,9 @@ static func dict_from_level(src: LevelBase, keep_route: bool = true) -> Dictiona
 	for e in src.extras:
 		extras.append(encode_extra(e))
 	for e in src.entities:
-		if e.type == "enemy":
+		# Only sweepers written into the object map (x/z runs); extras are
+		# already in the list above.
+		if e.type == "enemy" and e.has("ground_tile"):
 			var t: Vector2 = e.pos / TILE - Vector2(0.5, 0.5)
 			extras.append(encode_extra({type = "enemy", tile = t.round(), travel = e.travel,
 				period = e.period, phase = e.phase}))

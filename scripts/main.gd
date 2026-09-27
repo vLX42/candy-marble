@@ -11,6 +11,10 @@ const LEVELS: Array[GDScript] = [
 	preload("res://scripts/levels/level_4.gd"),
 	preload("res://scripts/levels/level_5.gd"),
 	preload("res://scripts/levels/level_6.gd"),
+	preload("res://scripts/levels/level_7.gd"),
+	preload("res://scripts/levels/level_8.gd"),
+	preload("res://scripts/levels/level_9.gd"),
+	preload("res://scripts/levels/level_10.gd"),
 ]
 
 const SCENES := {
@@ -31,6 +35,9 @@ const SCENES := {
 	"windmill": preload("res://scenes/windmill.tscn"),
 	"catapult": preload("res://scenes/catapult.tscn"),
 	"goo": preload("res://scenes/goo.tscn"),
+	"secret": preload("res://scenes/secret.tscn"),
+	"gate": preload("res://scenes/gate.tscn"),
+	"switch": preload("res://scenes/candy_switch.tscn"),
 }
 ## Sugar Rush: pinball hits fill the meter; full = a few seconds of rush.
 const RUSH_HITS := 6.0
@@ -650,6 +657,13 @@ func _camera_focus() -> Vector3:
 func _on_ball_died() -> void:
 	falls += 1
 	level_falls += 1
+	if ball.death_cause == "melt":
+		# Melted in sour goo: a green splash instead of the candy pop.
+		ball.death_cause = ""
+		sfx.play("goo")
+		burst(ball.global_position, [Color("#9BE35A"), Color("#6FD13A"), Color("#DFFFB0")], 22, 3.5)
+		_shake = 0.15
+		return
 	sfx.play("pop")
 	burst(ball.global_position, [Palette.WHITE, Palette.RASPBERRY, Palette.PINK], 28, 5.0)
 	_shake = 0.3
@@ -765,6 +779,23 @@ static func medal_for(time: float, par: float) -> String:
 func _update_best_label() -> void:
 	var best := scores.best(_score_key())
 	hud.set_best(best)
+
+
+## A floor switch was pressed: timed gates get a countdown banner.
+func on_switch(open_time: float) -> void:
+	sfx.play("go", -6.0, 0.0)
+	if open_time > 0.0:
+		show_message("Gate open!\n%.0f seconds, go go go!" % open_time, minf(open_time, 3.0))
+	else:
+		show_message("Click!\nSomething opened.", 1.6)
+
+
+## A pinball drop-target bank at `at` was cleared: open the gates it guards.
+func bank_cleared(at: Vector3) -> void:
+	for g in get_tree().get_nodes_in_group("gate"):
+		if g.channel == "targets" and g.global_position.distance_to(at) < 40.0:
+			g.trigger(0.0)
+	show_message("Targets down!\nThe exit gate is open.", 2.0)
 
 
 ## Positional-ish one-shot for toys: quieter the further from the marble.

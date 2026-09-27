@@ -41,12 +41,23 @@ menu.
 
 | # | Level | Par | What's in it |
 |---|---|---|---|
-| 1 | Sugar Lane | 105 s | A descent from the top of the candy hills: slope, slalom, stairs, the candy chute, a leap, a loop, a river |
-| 2 | Gumdrop Pinball | 80 s | RACE. Pinball park: tables, windmills, a loop, stairs, a catapult |
-| 3 | Sprinkle Skies | 75 s | Island hopping: kickers, hoppers, a cannon, a leap, a ghost garden, a catapult |
-| 4 | Licorice Loops | 90 s | Stompers, the candy chute, windmills and haunted hills on the way down |
-| 5 | Candy Castle | 110 s | RACE up the castle: hoppers, stompers, cannons, windmills, ghosts, a catapult |
-| 6 | Pinball Parlor | 125 s | Speed run through every toy in the park |
+| 1 | Sugar Hill | 78 s | Wide slopes, a hedge maze with a key switch, a hidden bridge, a locked pinball table |
+| 2 | Gumdrop Fork | 60 s | The road splits twice: the gate key is in the fast sweeper lane. A maze in between |
+| 3 | Waffle Falls | 68 s | Tall waffle cliffs (falls break you), a waffle maze, beams and a hump bridge |
+| 4 | Licorice Derby | 38 s | RACE: boost lanes, banked U-turns, a jump |
+| 5 | Sprinkle Islands | 55 s | Island hopping by kicker, cannon and catapult, a maze island. Easter eggs! |
+| 6 | Clockwork Bakery | 68 s | A timed gate at the end of the big stomper press, a maze, fast sweepers |
+| 7 | Sour Swamp | 78 s | Planks over goo, a goo maze with a key, humps and ghosts. Goo melts you |
+| 8 | Pinball Wizard | 66 s | Two real pinball tables: flippers, jets, orbit, plunger. Clear the targets to get out |
+| 9 | Rollercoaster Ridge | 72 s | Speed: loops, the chute, a bridge puzzle, leaps, a cannon, a pinball table |
+| 10 | Candy Summit | 60 s | Final RACE, uphill to the summit flag |
+
+**Puzzles**: floor switches open candy gates (some only for a few seconds) or
+raise hidden bridges; pinball exits open when their drop target bank is down.
+**Pinball tables** are laid out like the real thing: plunger lane (skill
+shot), rollover lanes, jet bumpers, drop targets, spinner orbit, slingshots,
+flippers, and drains you can fall into.
+The levels are built by `tools/make_campaign.py` (`python3 tools/make_campaign.py`).
 
 **Hazards**: sweepers (wind-up blocks), gumdrop hoppers (go under mid-hop),
 marshmallow stompers (pass while they're up), sour ghosts (they chase you,

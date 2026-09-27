@@ -194,7 +194,7 @@ func _build_ui() -> void:
 	_levels_panel.visible = false
 	root.add_child(_levels_panel)
 	var grid := GridContainer.new()
-	grid.columns = 3 if not narrow else 1
+	grid.columns = 4 if not narrow else 2
 	grid.add_theme_constant_override("h_separation", 14)
 	grid.add_theme_constant_override("v_separation", 14)
 	_levels_panel.add_child(grid)
@@ -210,8 +210,8 @@ func _build_ui() -> void:
 		if i >= unlocked:
 			b.text = "%d  %s\nlocked\nfinish level %d" % [i + 1, lvl.title, i]
 			b.disabled = true
-		b.custom_minimum_size = Vector2(330, 118) if not narrow else Vector2(540, 96)
-		b.add_theme_font_size_override("font_size", 24)
+		b.custom_minimum_size = Vector2(290, 104) if not narrow else Vector2(265, 96)
+		b.add_theme_font_size_override("font_size", 22)
 		grid.add_child(b)
 	_levels_panel.add_child(_button("Back", _show_menu))
 	_build_settings(root)

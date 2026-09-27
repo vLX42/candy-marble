@@ -54,6 +54,9 @@ func _initialize() -> void:
 func _process(delta: float) -> bool:
 	level_t += delta
 	var ball: Ball = main.ball
+	if "--trace" in OS.get_cmdline_user_args() and int(level_t * 120) % 15 == 0 and ball.alive:
+		var q := ball.global_position / LevelBase.TILE
+		print("  trace t=%.2f tile=(%.1f, %.1f) y=%.2f wp=%d v=%s" % [level_t, q.x, q.z, ball.global_position.y, wp, ball.linear_velocity.snapped(Vector3.ONE * 0.1)])
 	if main.finished:
 		# Race levels: also wait for the rival to cross the line (or give up).
 		if main.rival and main.rival_time < 0.0 and not main.rival.finished and level_t < MAX_SIM_TIME + 120.0 \
@@ -105,7 +108,11 @@ func _steer(ball: Ball) -> void:
 	while wp < route.size() - 1:
 		var here := route[wp]
 		var next := route[wp + 1]
-		if pos.distance_to(here) < 1.0 or (pos - here).dot(next - here) > 0.0:
+		# "Past" needs both legs: beyond the corner along the next leg AND
+		# (nearly) reached it along the leg we're on, or U-turns get cut.
+		var came := here - route[wp - 1] if wp > 0 else Vector2.ZERO
+		var reached := came.length() < 0.01 or (pos - here).dot(came.normalized()) > -1.0
+		if pos.distance_to(here) < 1.0 or ((pos - here).dot(next - here) > 0.0 and reached):
 			wp += 1
 		else:
 			break

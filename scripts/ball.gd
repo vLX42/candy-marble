@@ -11,8 +11,8 @@ signal landed(impact: float)
 ## Knocked into a wall or block (impact = speed lost).
 signal bonked(impact: float)
 
-@export var push_force := 16.0
-@export var max_speed := 8.0
+@export var push_force := 19.0
+@export var max_speed := 10.0
 @export_range(0.0, 1.0) var air_control := 0.3
 @export var fall_limit := -10.0
 ## Marble Madness rule: landing after a fall taller than this breaks the
@@ -39,6 +39,9 @@ var _flying := false
 ## Highest point since the marble last touched something (for break_drop).
 var _air_top := -INF
 var _prev_vel := Vector3.ZERO
+## How the last death happened ("melt" for sour goo), for the effects.
+var death_cause := ""
+var _melting := false
 var _knock_cool := 0.0
 
 
@@ -88,6 +91,10 @@ func _physics_process(_delta: float) -> void:
 	_check_impacts(_delta)
 	if _flying and input_lock <= 0.0 and get_contact_count() > 0:
 		_flying = false
+		if _land_speed > 0.0:
+			var flat := Vector3(linear_velocity.x, 0.0, linear_velocity.z).limit_length(_land_speed)
+			linear_velocity = Vector3(flat.x, 0.0, flat.z)
+			_land_speed = 0.0
 		linear_damp_mode = RigidBody3D.DAMP_MODE_COMBINE
 		linear_damp = 0.05
 	if input_lock > 0.0:
@@ -254,7 +261,12 @@ func hold_at(p: Vector3) -> void:
 
 
 ## ...then fire it from `p` with velocity `v`.
-func fire_from(p: Vector3, v: Vector3) -> void:
+## Long cannon shots: on touchdown, trim the speed to this (0 = keep it).
+var _land_speed := 0.0
+
+
+func fire_from(p: Vector3, v: Vector3, land_speed: float = 0.0) -> void:
+	_land_speed = land_speed
 	if not alive:
 		return
 	global_position = p
@@ -289,6 +301,62 @@ func sink() -> void:
 		collision_mask = 0)
 
 
+## Sour goo: the marble sinks into a bubbling green puddle, then comes back
+## at the checkpoint like any other fall.
+func melt() -> void:
+	if not alive or _melting:
+		return
+	_melting = true
+	input_lock = 2.0
+	set_deferred("freeze", true)
+	await get_tree().physics_frame
+	# Upright, so it squashes downwards whatever way it was rolling.
+	global_rotation = Vector3.ZERO
+	var model: Node3D = $Model
+	var goo := MeshInstance3D.new()
+	goo.mesh = Palette.sphere(radius * 1.08)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color("#9BE35A", 0.0)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.emission_enabled = true
+	mat.emission = Color("#6FD13A")
+	mat.emission_energy_multiplier = 0.4
+	mat.roughness = 0.1
+	goo.material_override = mat
+	add_child(goo)
+	var bubbles := CPUParticles3D.new()
+	bubbles.mesh = Palette.sphere(0.07)
+	var bm := StandardMaterial3D.new()
+	bm.albedo_color = Color("#B8F07A")
+	bubbles.mesh.material = bm
+	bubbles.amount = 24
+	bubbles.lifetime = 0.8
+	bubbles.direction = Vector3.UP
+	bubbles.spread = 25.0
+	bubbles.initial_velocity_min = 0.6
+	bubbles.initial_velocity_max = 1.6
+	bubbles.gravity = Vector3.ZERO
+	bubbles.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	bubbles.emission_sphere_radius = radius
+	add_child(bubbles)
+	bubbles.emitting = true
+	var squash := Vector3(1.7, 0.1, 1.7)
+	var down := Vector3(0, -radius * 0.9, 0)
+	var tw := create_tween().set_parallel()
+	tw.tween_property(mat, "albedo_color:a", 0.85, 0.25)
+	tw.tween_property(model, "scale", squash, 1.0).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(model, "position", down, 1.0).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(goo, "scale", squash, 1.0).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(goo, "position", down, 1.0).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	await tw.finished
+	goo.queue_free()
+	bubbles.queue_free()
+	death_cause = "melt"
+	_melting = false
+	input_lock = 0.0
+	die()
+
+
 func die() -> void:
 	if not alive:
 		return
@@ -301,6 +369,7 @@ func die() -> void:
 	await get_tree().create_timer(1.0).timeout
 	global_transform = Transform3D(Basis.IDENTITY, spawn_point)
 	$Model.scale = Vector3.ONE
+	$Model.position = Vector3.ZERO
 	linear_velocity = Vector3.ZERO
 	angular_velocity = Vector3.ZERO
 	freeze = false

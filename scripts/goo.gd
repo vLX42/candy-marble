@@ -1,7 +1,7 @@
 class_name Goo
 extends Area3D
 ## Sour apple goo pool (Marble Madness's acid): one tile of bubbling green
-## slime. Rolling into it pops the marble, Sugar Rush or not.
+## slime. Rolling into it melts the marble, Sugar Rush or not.
 
 var _bubbles: Array[Node3D] = []
 var _t := 0.0
@@ -9,10 +9,12 @@ var _t := 0.0
 
 func _ready() -> void:
 	var box := BoxShape3D.new()
-	box.size = Vector3(1.2, 0.5, 1.2)
+	# Flat and low, so rolling along a plank edge right next to goo is safe;
+	# the marble has to actually be in the pool.
+	box.size = Vector3(1.2, 0.3, 1.2)
 	var cs := CollisionShape3D.new()
 	cs.shape = box
-	cs.position.y = 0.3
+	cs.position.y = 0.1
 	add_child(cs)
 	body_entered.connect(_on_body_entered)
 	var slab := MeshInstance3D.new()
@@ -55,4 +57,4 @@ func _process(delta: float) -> void:
 func _on_body_entered(body: Node3D) -> void:
 	if body is Ball and body.alive:
 		get_tree().call_group("game", "cheer", "SOUR!", global_position + Vector3.UP * 1.4)
-		body.die()
+		body.melt()

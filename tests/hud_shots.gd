@@ -13,7 +13,7 @@ var steps := [
 	["rush", 0.6, func():
 		for i in 6: main.charge(1.0, main.ball.global_position)],
 	["goal", 1.5, func(): _put(main.ball, main.ground(main.level.goal) + Vector3.UP * 0.8)],
-	["race_intro", 1.0, func(): main.start_level(1)],
+	["race_intro", 1.0, func(): main.start_level(3)],
 	["race_playing", 3.5, func(): pass],
 	["race_lost", 1.5, func(): _put(main.rival, main.ground(main.level.goal) + Vector3.UP * 0.8)],
 	["race_second", 1.5, func(): _put(main.ball, main.ground(main.level.goal) + Vector3.UP * 0.8)],

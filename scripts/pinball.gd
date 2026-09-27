@@ -11,10 +11,13 @@ extends Node3D
 ##   spinner     gate with a flag that spins as you pass (points per turn)
 ##   redirect    speed bank: turns a fast ball to local +z keeping its speed
 
-@export_enum("slingshot", "cannon", "rollover", "hoop", "target", "spinner", "redirect") var kind := "slingshot"
+@export_enum("slingshot", "cannon", "rollover", "hoop", "target", "spinner", "redirect", "flipper") var kind := "slingshot"
 @export var target := Vector2.ZERO
 @export var height := 2.2
 @export var strength := 10.0
+## Cannon: seconds in the air (0 = automatic). Long, high shots use more,
+## and land softly.
+@export var hang := 0.0
 
 var lit := false
 var down := false
@@ -37,6 +40,7 @@ func _ready() -> void:
 		"target": _build_target()
 		"spinner": _build_spinner()
 		"redirect": _build_redirect()
+		"flipper": _build_flipper()
 
 
 func _area(size: Vector3, offset: Vector3, callback: Callable) -> Area3D:
@@ -94,6 +98,42 @@ func _on_slingshot(ball: Ball) -> void:
 	_squash()
 
 
+# --- flipper --------------------------------------------------------------------
+# A pinball flipper: roll onto it and it snaps up, batting the marble up the
+# table (local +z). Strength is the launch speed.
+
+var _flip_pivot: Node3D
+var _flip_cool := 0.0
+
+
+func _build_flipper() -> void:
+	if strength == 10.0:
+		strength = 13.0
+	_flip_pivot = Node3D.new()
+	_flip_pivot.position = Vector3(-1.0, 0.0, 0.0)
+	add_child(_flip_pivot)
+	# Paddle: fat at the pivot, thin at the tip, candy red with a cream stripe.
+	Palette.add_mesh(_flip_pivot, Palette.cylinder(0.32, 0.32, 0.36), Palette.CREAM, Vector3(0, 0.18, 0))
+	var paddle := Palette.add_mesh(_flip_pivot, Palette.box(Vector3(2.0, 0.3, 0.42)), Palette.RASPBERRY, Vector3(1.0, 0.16, 0))
+	paddle.rotation_degrees.y = -4.0
+	Palette.add_mesh(_flip_pivot, Palette.box(Vector3(1.9, 0.06, 0.2)), Palette.CREAM, Vector3(1.0, 0.33, 0))
+	Palette.add_mesh(_flip_pivot, Palette.cylinder(0.2, 0.2, 0.3), Palette.RASPBERRY, Vector3(2.0, 0.15, 0))
+	_area(Vector3(2.4, 0.9, 1.4), Vector3(0, 0.45, 0), _on_flipper)
+
+
+func _on_flipper(ball: Ball) -> void:
+	if _flip_cool > 0.0:
+		return
+	_flip_cool = 0.45
+	var dir := global_basis.z.normalized()
+	ball.call_deferred("kick", dir, strength)
+	_score(10)
+	get_tree().call_group("game", "play_sound", "boing", global_position)
+	var tw := create_tween()
+	tw.tween_property(_flip_pivot, "rotation_degrees:y", 38.0, 0.06)
+	tw.tween_property(_flip_pivot, "rotation_degrees:y", 0.0, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
 # --- cannon ---------------------------------------------------------------------
 
 func _build_cannon() -> void:
@@ -125,10 +165,10 @@ func _on_cannon(ball: Ball) -> void:
 	var level: LevelBase = get_tree().get_first_node_in_group("game").level
 	var dest := Vector3(target.x, level.height(target.x, target.y) + 0.6, target.y)
 	var flat := Vector2(dest.x - start.x, dest.z - start.z)
-	var t := clampf(flat.length() / 9.0, 0.8, 1.8)
+	var t := clampf(flat.length() / 9.0, 0.8, 1.8) if hang <= 0.0 else hang
 	var g := float(ProjectSettings.get_setting("physics/3d/default_gravity"))
 	var v := Vector3(flat.x / t, (dest.y - start.y + 0.5 * g * t * t) / t, flat.y / t)
-	ball.call_deferred("fire_from", start, v)
+	ball.call_deferred("fire_from", start, v, 5.0 if hang > 0.0 else 0.0)
 	_score(100, "BOOM")
 	get_tree().call_group("game", "on_bump", global_position)
 	await get_tree().create_timer(0.6).timeout
@@ -213,12 +253,31 @@ func _on_target(_ball: Ball) -> void:
 	var tw := create_tween()
 	tw.tween_property(_visual, "position:y", -0.95, 0.15)
 	_score(75)
-	for t in get_tree().get_nodes_in_group("pinball_target"):
+	# A bank is the targets standing next to each other.
+	var bank := _bank()
+	for t in bank:
 		if not t.down:
 			return
+	var center := Vector3.ZERO
+	for t in bank:
+		center += t.global_position / bank.size()
 	get_tree().call_group("game", "cheer", "TARGETS!", global_position + Vector3.UP * 2.0)
+	get_tree().call_group("game", "bank_cleared", center)
 	await get_tree().create_timer(2.0).timeout
-	get_tree().call_group("pinball_target", "reset_target")
+	for t in bank:
+		if is_instance_valid(t):
+			t.reset_target()
+
+
+func _bank() -> Array:
+	var bank: Array = [self]
+	var k := 0
+	while k < bank.size():
+		for t in get_tree().get_nodes_in_group("pinball_target"):
+			if t not in bank and t.global_position.distance_to(bank[k].global_position) < 4.5:
+				bank.append(t)
+		k += 1
+	return bank
 
 
 func reset_target() -> void:
@@ -253,6 +312,7 @@ func _on_spinner(ball: Ball) -> void:
 
 
 func _process(delta: float) -> void:
+	_flip_cool = maxf(0.0, _flip_cool - delta)
 	if kind == "spinner" and _spin > 0.0:
 		_blade.rotation.x += _spin * delta
 		_spin_acc += _spin * delta

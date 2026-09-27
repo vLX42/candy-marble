@@ -53,6 +53,7 @@ class Course:
         return (self.ox + x * f[0] + z * l[0], self.oz + x * f[1] + z * l[1])
 
     def place(self, p):
+        zo = getattr(p, "zoff", 0)   # wide pieces: lane rows are zo+1..zo+4
         for z in range(p.H):
             for x in range(p.W):
                 hc = p.heights[z][x]
@@ -68,7 +69,7 @@ class Course:
                 else:
                     hc = rot(hc, H_ROT, self.h)
                 oc = rot(oc, O_ROT, self.h)
-                w = self._world(x, z)
+                w = self._world(x, z - zo)
                 old = self.cells.get(w)
                 if old and old[0] != "." and hc != ".":
                     raise ValueError(f"overlap at {w} placing {p.name}")
@@ -77,9 +78,9 @@ class Course:
                 self.cells[w] = [hc, oc if oc != "." or not old else old[1]]
         for e in p.extras:
             d = dict(e)
-            d["tile"] = self._world(*e["tile"])
+            d["tile"] = self._world(e["tile"][0], e["tile"][1] - zo)
             if "target_tile" in d:
-                d["target_tile"] = self._world(*e["target_tile"])
+                d["target_tile"] = self._world(e["target_tile"][0], e["target_tile"][1] - zo)
             if "yaw" in d:
                 d["yaw"] = (d["yaw"] - 90.0 * self.h) % 360.0
             if "travel_tiles" in d:
@@ -92,7 +93,7 @@ class Course:
                 d["height"] = (self.tier - p.entry + d.pop("base", p.entry)) * 0.5 + d.pop("rise")
             self.extras.append(d)
         for (x, z) in p.route:
-            self.route.append(self._world(x, z))
+            self.route.append(self._world(x, z - zo))
         f = F[self.h]
         self.ox += f[0] * p.W
         self.oz += f[1] * p.W

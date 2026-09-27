@@ -4,6 +4,9 @@ extends SceneTree
 ## 1) rival sinks first, player rolls in after: 2nd place, level not cleared.
 ## 2) player sinks first: race won, rival stops.
 
+## Licorice Derby, the first race.
+const RACE_LEVEL := 3
+
 var main: Node3D
 var t := 0.0
 var phase := 0
@@ -14,7 +17,7 @@ var failed := false
 
 func _initialize() -> void:
 	main = load("res://scenes/main.tscn").instantiate()
-	main.first_level = 1
+	main.first_level = RACE_LEVEL
 	main.save_scores = false
 	main.countdown = false
 	root.add_child(main)
@@ -40,7 +43,7 @@ func _process(delta: float) -> bool:
 				var msg: String = main.hud.results_text()
 				_check("player still finishes, in 2nd place", main.finished and msg.contains("2nd place"),
 					"finished=%s msg=%s" % [main.finished, msg.replace("\n", " | ")])
-				main.start_level(1)
+				main.start_level(RACE_LEVEL)
 				_next()
 		3:
 			if pt > 0.5:

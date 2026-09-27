@@ -78,8 +78,8 @@ func _process(delta: float) -> bool:
 			if pt < 5.0 and ball.alive and phase_start >= 0.0 and not has_meta("dropped"):
 				set_meta("dropped", pt)
 				_put(ball, Vector3(21.0, 0.6, 9.0), Vector3.ZERO)
-			if has_meta("dropped") and pt > float(get_meta("dropped")) + 1.0:
-				_check("sour goo pops the marble", main.falls > mark, "falls %d -> %d" % [mark, main.falls])
+			if has_meta("dropped") and pt > float(get_meta("dropped")) + 2.0:
+				_check("sour goo melts the marble", main.falls > mark, "falls %d -> %d" % [mark, main.falls])
 				mark = main.falls
 				_put(ball, Vector3(24.0, 0.6, 9.0), Vector3.ZERO)
 				_next()

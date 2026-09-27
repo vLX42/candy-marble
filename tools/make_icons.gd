@@ -159,6 +159,7 @@ func _initialize() -> void:
 		hoop = [["0"], [], [{type = "hoop", tile = [0, 0], yaw = 45.0, height = 1.2}], 4.0],
 		spinner = [["0"], [], [{type = "spinner", tile = [0, 0], yaw = 45.0}], 2.6],
 		redirect = [["0"], [], [{type = "redirect", tile = [0, 0], yaw = 90.0}], 2.8],
+		flipper = [["00"], [], [{type = "flipper", tile = [0.5, 0], yaw = 0.0}], 3.2],
 	}
 	for id: String in tiles:
 		jobs.append(["tile", id, tiles[id]])

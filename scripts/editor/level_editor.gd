@@ -60,6 +60,7 @@ const TOOLS := [
 	["hoop", "Hoop", "Toys", "Ring to jump through."],
 	["spinner", "Spinner", "Toys", "Spinning gate."],
 	["redirect", "Turner", "Toys", "Catches the marble and launches it the way it points."],
+	["flipper", "Flipper", "Toys", "Pinball flipper: bats the marble the way it points (R turns)."],
 ]
 const OBJ_CHAR := {spawn = "S", goal = "G", bumper = "B", star = "@", target = "#",
 	waves = "W", hill = "H", trench = "T", goo = "A", humps = "M"}
@@ -75,7 +76,7 @@ const BOOSTER_TURN := {">": "v", "v": "<", "<": "^", "^": ">"}
 const EXTRA_NAMES := {
 	"enemy": "Sweeper", "stomper": "Stomper", "hopper": "Hopper", "ghost": "Ghost", "windmill": "Windmill",
 	"slingshot": "Slingshot", "cannon": "Cannon", "catapult": "Catapult", "loop": "Loop", "chute": "Chute",
-	"hoop": "Hoop", "spinner": "Spinner", "redirect": "Turner",
+	"hoop": "Hoop", "spinner": "Spinner", "redirect": "Turner", "flipper": "Flipper",
 }
 const PAINT_TOOLS := ["road", "paint", "raise", "lower", "ramp", "erase", "waves", "hill", "trench", "goo", "humps", "clear", "decor",
 	"bumper", "star", "target", "booster"]

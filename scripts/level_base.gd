@@ -93,7 +93,7 @@ func build() -> void:
 		if d.has("target_tile"):
 			d.target = tile_center_f(d.target_tile)
 			d.erase("target_tile")
-		if d.type in ["slingshot", "cannon", "hoop", "spinner", "redirect"]:
+		if d.type in ["slingshot", "cannon", "hoop", "spinner", "redirect", "flipper"]:
 			d.kind = d.type
 			d.type = "pinball"
 		entities.append(d)
