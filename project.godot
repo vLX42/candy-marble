@@ -26,6 +26,7 @@ boot_splash/use_filter=true
 Settings="*res://scripts/settings.gd"
 Transition="*res://scripts/transition.gd"
 UiSound="*res://scripts/ui_sound.gd"
+Tilt="*res://scripts/tilt.gd"
 
 [display]
 

@@ -39,7 +39,7 @@ jobs:
       - name: Tests
         run: |
           set -e
-          for t in playtest race_test hazards_test madness_test flow_test editor_test sections_test; do
+          for t in playtest race_test hazards_test madness_test flow_test touch_test editor_test sections_test; do
             echo "::group::$t"
             godot --headless --fixed-fps 120 -s tests/$t.gd
             echo "::endgroup::"

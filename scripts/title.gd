@@ -174,7 +174,11 @@ func _build_ui() -> void:
 		_menu.add_child(play)
 	_menu.add_child(_button("Levels", _show_levels))
 	_menu.add_child(_pair(_button("Quests", _show_quests), _button("Level editor", _open_editor)))
-	_menu.add_child(_pair(_button("Settings", _show_settings), _button("Quit", func() -> void: get_tree().quit())))
+	if OS.has_feature("web"):
+		# No quitting a web page.
+		_menu.add_child(_button("Settings", _show_settings))
+	else:
+		_menu.add_child(_pair(_button("Settings", _show_settings), _button("Quit", func() -> void: get_tree().quit())))
 	var runs: Array = _scores.top("run")
 	if runs.size() > 0:
 		var best := Label.new()
@@ -213,6 +217,8 @@ func _build_ui() -> void:
 
 	var hint := Label.new()
 	hint.text = "WASD / arrows / stick to roll    R restart    Esc menu    F11 fullscreen"
+	if Tilt.is_touch():
+		hint.text = "Tilt your phone to roll.   Tap  II  to pause."
 	CandyText.style(hint, 22, CandyText.CHOCOLATE, false)
 	hint.anchor_top = 1.0
 	hint.anchor_bottom = 1.0
@@ -360,6 +366,12 @@ func _build_settings(root: Control) -> void:
 	_settings_panel.add_child(_setting_button(func() -> String:
 		return "Fullscreen: %s" % ("on" if Settings.fullscreen else "off"),
 		func() -> void: Settings.toggle_fullscreen()))
+	if Tilt.is_touch():
+		_settings_panel.add_child(_setting_button(func() -> String:
+			return "Controls: %s" % ("tilt the phone" if Settings.control_mode == "tilt" else "drag to roll"),
+			func() -> void: Settings.set_value("control_mode", "stick" if Settings.control_mode == "tilt" else "tilt")))
+		_settings_panel.add_child(_slider("Tilt", (Settings.tilt_sensitivity - 0.5) / 1.5, func(v: float) -> void:
+			Settings.set_value("tilt_sensitivity", 0.5 + v * 1.5)))
 	_settings_panel.add_child(_setting_button(func() -> String:
 		return "Best-run ghost: %s" % ("on" if Settings.ghost else "off"),
 		func() -> void: Settings.set_value("ghost", not Settings.ghost)))
@@ -415,6 +427,7 @@ func _slider(title: String, value: float, on_change: Callable) -> Control:
 
 func _show_settings() -> void:
 	_menu.visible = false
+	_front[2].visible = false  # the controls hint; settings reaches down there
 	_settings_panel.visible = true
 	(_settings_panel.get_child(0) as Button).grab_focus()
 

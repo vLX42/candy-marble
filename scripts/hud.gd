@@ -41,6 +41,9 @@ var _count: RichTextLabel
 var _count_tween: Tween
 var _pause: PanelContainer
 var _pause_box: VBoxContainer
+var _res_buttons: HBoxContainer
+var _pause_button: Button
+var _stick: Control
 
 signal pause_action(action: String)
 ## A results chip just stamped in (main plays a chime).
@@ -55,6 +58,7 @@ func _ready() -> void:
 	_build_toast()
 	_build_results()
 	_build_count()
+	_build_touch()
 	_build_pause()
 
 
@@ -79,9 +83,15 @@ func show_pause(back_label: String) -> void:
 		if c is Button:
 			_pause_box.remove_child(c)
 			c.queue_free()
-	for spec: Array in [["Resume", "resume"], ["Restart level", "restart"],
-			["Camera: %s" % ("follows the track" if Settings.camera_follow else "fixed"), "camera"],
-			["Ghost: %s" % ("on" if Settings.ghost else "off"), "ghost"], [back_label, "quit"]]:
+	var items: Array = [["Resume", "resume"], ["Restart level", "restart"]]
+	if Tilt.is_touch():
+		if Tilt.active():
+			items.append(["Recalibrate tilt", "calibrate"])
+		items.append(["Controls: %s" % ("tilt the phone" if Settings.control_mode == "tilt" else "drag to roll"), "controls"])
+	items.append(["Camera: %s" % ("follows the track" if Settings.camera_follow else "fixed"), "camera"])
+	items.append(["Ghost: %s" % ("on" if Settings.ghost else "off"), "ghost"])
+	items.append([back_label, "quit"])
+	for spec: Array in items:
 		var b := Button.new()
 		b.text = spec[0]
 		b.custom_minimum_size.x = 380
@@ -184,6 +194,20 @@ func show_results(r: Dictionary) -> void:
 		_res_board.add_child(t)
 		_res_board.add_child(_plain("  NEW" if k == hl else "", 18, Palette.CORAL))
 	_res_hint.text = r.get("hint", "")
+	_res_hint.visible = not Tilt.is_touch()
+	for c in _res_buttons.get_children():
+		_res_buttons.remove_child(c)
+		c.queue_free()
+	var btns: Array = [["Retry", "retry"]]
+	if r.get("next", false):
+		btns.append(["Next level", "next"])
+	btns.append(["Menu", "toggle"])
+	for spec: Array in btns:
+		var b := Button.new()
+		b.text = spec[0]
+		b.custom_minimum_size = Vector2(130, 0)
+		b.pressed.connect(func() -> void: pause_action.emit(spec[1]))
+		_res_buttons.add_child(b)
 	_results.visible = true
 	_results.pivot_offset = _results.size * 0.5
 	_results.scale = Vector2(0.85, 0.85)
@@ -381,6 +405,45 @@ func _build_count() -> void:
 	wrap.add_child(_count)
 
 
+## Round pause button (touch screens) and the drag-stick ring.
+func _build_touch() -> void:
+	_stick = Control.new()
+	_stick.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_stick.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_stick.draw.connect(_draw_stick)
+	add_child(_stick)
+	_pause_button = Button.new()
+	_pause_button.text = "II"
+	_pause_button.theme = CandyTheme.make(30)
+	_pause_button.anchor_left = 0.5
+	_pause_button.anchor_right = 0.5
+	_pause_button.offset_left = -38
+	_pause_button.offset_right = 38
+	_pause_button.offset_top = 16
+	_pause_button.offset_bottom = 88
+	_pause_button.focus_mode = Control.FOCUS_NONE
+	_pause_button.visible = Tilt.is_touch()
+	_pause_button.pressed.connect(func() -> void: pause_action.emit("toggle"))
+	add_child(_pause_button)
+
+
+func _process(_delta: float) -> void:
+	if _stick and Tilt.is_touch():
+		_stick.queue_redraw()
+
+
+func _draw_stick() -> void:
+	var st: Array = Tilt.stick_state()
+	if not st[0]:
+		return
+	var o: Vector2 = st[1]
+	var p: Vector2 = o + (st[2] - o).limit_length(90.0)
+	_stick.draw_circle(o, 92.0, Color(1, 0.96, 0.88, 0.35))
+	_stick.draw_arc(o, 92.0, 0.0, TAU, 48, Color(Palette.PINK, 0.9), 5.0, true)
+	_stick.draw_circle(p, 38.0, Color(Palette.PINK, 0.95))
+	_stick.draw_circle(p, 26.0, Color(1, 0.96, 0.88, 0.95))
+
+
 func _build_pause() -> void:
 	var dim := ColorRect.new()
 	dim.color = Color(0.35, 0.2, 0.3, 0.35)
@@ -455,6 +518,12 @@ func _build_results() -> void:
 	_res_hint = _plain("", 18, MUTED)
 	_res_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(_res_hint)
+	# Tap targets (phones have no R or Esc key).
+	_res_buttons = HBoxContainer.new()
+	_res_buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+	_res_buttons.add_theme_constant_override("separation", 10)
+	_res_buttons.theme = CandyTheme.make(24)
+	col.add_child(_res_buttons)
 
 
 func _set_toast(text: String) -> void:

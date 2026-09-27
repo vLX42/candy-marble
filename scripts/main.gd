@@ -82,6 +82,8 @@ var _count_shown := ""
 var _ghost_rec := PackedVector3Array()
 var _ghost_play := PackedVector3Array()
 var _ghost: Node3D
+## Touch controls (tilt or stick) are driving the input actions.
+var _touch_driving := false
 
 var level: LevelBase
 var level_index := 0
@@ -326,11 +328,14 @@ func _process(delta: float) -> void:
 		if n != _count_shown:
 			_count_shown = n
 			hud.show_count(n)
+			if n == "GO!":
+				Tilt.calibrate()
 			sfx.play("go" if n == "GO!" else "tick", -4.0 if n == "GO!" else -8.0, 0.0)
 	elif not finished and not game_complete:
 		total_time += delta
 		level_time += delta
 		_record_ghost()
+	_touch_input()
 	_update_ghost()
 	if ball and ball.alive and not finished:
 		sfx.set_roll(Vector2(ball.linear_velocity.x, ball.linear_velocity.z).length(), ball.is_grounded(), delta)
@@ -376,6 +381,40 @@ func _restart() -> void:
 		start_level(level_index)
 
 
+# --- Touch controls -----------------------------------------------------------
+
+## Phone tilt (or the drag stick) presses the same actions as the keyboard.
+func _touch_input() -> void:
+	if ball and OS.has_feature("web"):
+		Tilt.report(ball.global_position, level_time, Input.get_vector("left", "right", "up", "down"))
+	if not Tilt.is_touch():
+		return
+	var v := Tilt.vector() if Tilt.active() else Tilt.stick_vector()
+	if v == Vector2.ZERO and not _touch_driving:
+		return
+	_touch_driving = v != Vector2.ZERO
+	_touch_press("right", v.x)
+	_touch_press("left", -v.x)
+	_touch_press("down", v.y)
+	_touch_press("up", -v.y)
+
+
+func _touch_press(action: String, value: float) -> void:
+	if value > 0.05:
+		Input.action_press(action, value)
+	else:
+		Input.action_release(action)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch or event is InputEventScreenDrag:
+		var playing := not get_tree().paused and not finished and not game_complete
+		if playing and (Settings.control_mode == "stick" or not Tilt.active()):
+			Tilt.handle_touch(event)
+		elif not playing:
+			Tilt.release_stick()
+
+
 # --- Pause ------------------------------------------------------------------
 
 ## Esc / Start pauses mid-level. Returns true while paused.
@@ -389,8 +428,6 @@ func _handle_pause() -> bool:
 		else:
 			tree.paused = true
 			hud.show_pause("Back to the editor" if test_mode else "Quit to menu")
-			if not hud.pause_action.is_connected(_on_pause_action):
-				hud.pause_action.connect(_on_pause_action)
 		return true
 	return tree.paused
 
@@ -409,6 +446,26 @@ func _on_pause_action(action: String) -> void:
 			start_level(level_index)
 		"camera":
 			Settings.set_value("camera_follow", not Settings.camera_follow)
+			hud.show_pause("Back to the editor" if test_mode else "Quit to menu")
+		"toggle":
+			if get_tree().paused:
+				_resume()
+			elif finished or game_complete:
+				_leave()
+			else:
+				get_tree().paused = true
+				hud.show_pause("Back to the editor" if test_mode else "Quit to menu")
+		"calibrate":
+			Tilt.calibrate()
+			_resume()
+		"retry":
+			_resume()
+			_restart()
+		"next":
+			if finished and not game_complete and level_index < level_count() - 1 and not race_lost:
+				start_level(level_index + 1)
+		"controls":
+			Settings.set_value("control_mode", "stick" if Settings.control_mode == "tilt" else "tilt")
 			hud.show_pause("Back to the editor" if test_mode else "Quit to menu")
 		"ghost":
 			Settings.set_value("ghost", not Settings.ghost)
@@ -669,6 +726,7 @@ func _on_goal() -> void:
 		board_title = "BEST TIMES", board = scores.top(_score_key()), highlight = rank,
 		hint = "Next level coming up...      R  retry" if auto_advance else "R  retry      Esc  menu",
 		confetti = rank == 0 or medal == "GOLD",
+		next = level_index < level_count() - 1 and not test_mode,
 	}
 	if test_mode:
 		res.hint = "R  retry      Esc  back to the editor"
@@ -906,3 +964,4 @@ func _setup_hud() -> void:
 	hud = Hud.new()
 	add_child(hud)
 	hud.stamp.connect(func() -> void: sfx.play("coin", -9.0, 0.1))
+	hud.pause_action.connect(_on_pause_action)

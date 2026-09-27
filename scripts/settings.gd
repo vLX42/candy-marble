@@ -18,6 +18,9 @@ var sfx_volume := 0.9
 var graphics_high := true
 ## Show a see-through marble replaying your best run on each level.
 var ghost := true
+## Phones: "tilt" (gyroscope) or "stick" (drag anywhere).
+var control_mode := "tilt"
+var tilt_sensitivity := 1.0
 
 
 func _ready() -> void:
@@ -26,7 +29,11 @@ func _ready() -> void:
 			AudioServer.add_bus()
 			AudioServer.set_bus_name(AudioServer.bus_count - 1, bus)
 	var cfg := ConfigFile.new()
-	if cfg.load(PATH) == OK:
+	var loaded := cfg.load(PATH) == OK
+	if not loaded and DisplayServer.is_touchscreen_available():
+		# Phones: start with the lighter graphics.
+		graphics_high = false
+	if loaded:
 		fullscreen = cfg.get_value("display", "fullscreen", fullscreen)
 		camera_follow = cfg.get_value("camera", "follow", camera_follow)
 		zoom = cfg.get_value("camera", "zoom", zoom)
@@ -34,6 +41,8 @@ func _ready() -> void:
 		sfx_volume = cfg.get_value("audio", "sfx", sfx_volume)
 		graphics_high = cfg.get_value("display", "graphics_high", graphics_high)
 		ghost = cfg.get_value("game", "ghost", ghost)
+		control_mode = cfg.get_value("game", "control_mode", control_mode)
+		tilt_sensitivity = cfg.get_value("game", "tilt_sensitivity", tilt_sensitivity)
 	_apply()
 
 
@@ -61,6 +70,8 @@ func save() -> void:
 	cfg.set_value("audio", "music", music_volume)
 	cfg.set_value("audio", "sfx", sfx_volume)
 	cfg.set_value("game", "ghost", ghost)
+	cfg.set_value("game", "control_mode", control_mode)
+	cfg.set_value("game", "tilt_sensitivity", tilt_sensitivity)
 	cfg.save(PATH)
 
 

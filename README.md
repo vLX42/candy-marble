@@ -27,7 +27,9 @@ par. Best level times and best full runs are saved locally.
 godot --path .
 ```
 
-WASD / arrows / left stick to push the ball, R (or pad Back) to restart the
+On a phone (the web version), tilt the phone to roll; it calibrates to how
+you hold it when the level starts. Or switch to "drag to roll" in Settings.
+On a computer: WASD / arrows / left stick to push the ball, R (or pad Back) to restart the
 level, Esc / P (or pad Start) to pause, F11 or Alt+Enter for fullscreen.
 
 Each level starts with a 3-2-1-GO countdown; the clock starts on GO. Your best
