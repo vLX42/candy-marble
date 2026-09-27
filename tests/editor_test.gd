@@ -292,6 +292,12 @@ func _sanitize() -> void:
 
 func _start_game() -> void:
 	ed.save()
+	quest.updated = 5
+	ed.save_if_changed()
+	_check("leaving without changes doesn't stamp the quest", quest.updated == 5, str(quest.updated))
+	ed.unsaved = true
+	ed.save_if_changed()
+	_check("...but real changes are saved", quest.updated > 5 and not ed.unsaved, str(quest.updated))
 	var mg: GDScript = load("res://scripts/main.gd")
 	mg.set("quest", quest.duplicate_quest())
 	mg.set("test_mode", true)

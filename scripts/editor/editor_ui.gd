@@ -1091,11 +1091,11 @@ func refresh_quest() -> void:
 		open.add_item(other.name)
 	open.item_selected.connect(func(i: int) -> void:
 		if i > 0:
-			ed.quest.save()
+			ed.save_if_changed()
 			ed.open_quest(Quest.find(installed[i - 1].id)))
 	_quest_box.add_child(open)
 	_quest_box.add_child(_btn("Start a new quest", func() -> void:
-		ed.quest.save()
+		ed.save_if_changed()
 		var nq := Quest.create()
 		nq.levels = [LevelEditor.template("track", "Level 1")]
 		nq.author = ed.quest.author

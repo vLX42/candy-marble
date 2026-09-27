@@ -295,6 +295,14 @@ func save() -> void:
 	ui.toast("Saved  \"%s\"" % quest.name)
 
 
+## Saves only real changes: saving stamps the quest as edited, and an edited
+## shipped sample no longer gets the newer version on the next launch.
+func save_if_changed() -> void:
+	if unsaved:
+		quest.save()
+		unsaved = false
+
+
 ## `tiles_only`: only map characters changed (set_h / set_o), so the preview
 ## can rebuild just the touched chunks.
 func mark_edited(tiles_only: bool = false) -> void:
@@ -1445,8 +1453,7 @@ func test_play(from: Vector2i = Vector2i(-1, -1)) -> void:
 	if p.size() > 0 and (p[0].begins_with("No start") or p[0].begins_with("No hole")):
 		ui.toast(p[0])
 		return
-	quest.save()
-	unsaved = false
+	save_if_changed()
 	session_quest = quest
 	session_level = li
 	session_view = {target = cam_target, size = cam_size, yaw = cam_yaw, top = top_view}
@@ -1459,7 +1466,7 @@ func test_play(from: Vector2i = Vector2i(-1, -1)) -> void:
 
 
 func exit_to_menu() -> void:
-	quest.save()
+	save_if_changed()
 	TitleScreen.open_page = "quests"
 	Transition.go("res://scenes/title.tscn")
 
