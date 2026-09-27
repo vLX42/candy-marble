@@ -83,6 +83,7 @@ godot --headless --fixed-fps 120 -s tests/playtest.gd      # mechanics
 godot --headless --fixed-fps 120 -s tests/levels_test.gd   # bot plays every level
 godot --headless --fixed-fps 120 -s tests/race_test.gd     # race win / 2nd place outcomes
 godot --always-on-top -s tests/shots.gd                   # screenshots to tests/shots/
+godot --always-on-top -s tests/perf.gd -- --level=4       # fps, triangles, draw calls
 ```
 
 `playtest.gd` checks resting, input, speed cap, bumper, sweeper, loop, booster

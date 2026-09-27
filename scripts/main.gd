@@ -410,7 +410,7 @@ static func medal_for(time: float, par: float) -> String:
 
 func _update_best_label() -> void:
 	var best := scores.best(_score_key())
-	_hud_best.text = "Best %.2f" % best if best > 0.0 else ""
+	_hud_best.text = "best  %.2f" % best if best > 0.0 else "no best time yet"
 
 
 func on_bump(pos: Vector3) -> void:
@@ -591,27 +591,48 @@ func _setup_hud() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
 
-	_hud_level = _label(26)
-	_hud_level.position = Vector2(24, 16)
-	layer.add_child(_hud_level)
+	var left := _card()
+	left.position = Vector2(20, 14)
+	layer.add_child(left)
+	_hud_level = _label(24)
+	left.add_child(_hud_level)
 
-	_hud_time = _label(56)
-	_hud_time.anchor_left = 1.0
-	_hud_time.anchor_right = 1.0
-	_hud_time.offset_left = -300.0
-	_hud_time.offset_right = -24.0
-	_hud_time.offset_top = 8.0
+	# Top-right card: timer, best time, sugar meter, stacked so nothing overlaps.
+	var card := _card()
+	card.anchor_left = 1.0
+	card.anchor_right = 1.0
+	card.offset_left = -300.0
+	card.offset_right = -20.0
+	card.offset_top = 14.0
+	card.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	layer.add_child(card)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 2)
+	card.add_child(col)
+	_hud_time = _label(54)
 	_hud_time.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	layer.add_child(_hud_time)
-
-	_hud_best = _label(24)
-	_hud_best.anchor_left = 1.0
-	_hud_best.anchor_right = 1.0
-	_hud_best.offset_left = -300.0
-	_hud_best.offset_right = -28.0
-	_hud_best.offset_top = 78.0
+	col.add_child(_hud_time)
+	_hud_best = _label(22)
 	_hud_best.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	layer.add_child(_hud_best)
+	col.add_child(_hud_best)
+	_hud_rush = ProgressBar.new()
+	_hud_rush.show_percentage = false
+	_hud_rush.max_value = 1.0
+	_hud_rush.custom_minimum_size = Vector2(240, 18)
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(1, 1, 1, 0.8)
+	bg.set_corner_radius_all(10)
+	bg.border_color = Palette.PINK
+	bg.set_border_width_all(2)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = Palette.CORAL
+	fill.set_corner_radius_all(10)
+	_hud_rush.add_theme_stylebox_override("background", bg)
+	_hud_rush.add_theme_stylebox_override("fill", fill)
+	col.add_child(_hud_rush)
+	_hud_rush_label = _label(18)
+	_hud_rush_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	col.add_child(_hud_rush_label)
 
 	_hud_message = RichTextLabel.new()
 	_hud_message.bbcode_enabled = true
@@ -625,35 +646,6 @@ func _setup_hud() -> void:
 	CandyText.style(_hud_message, 52)
 	layer.add_child(_hud_message)
 
-	_hud_rush = ProgressBar.new()
-	_hud_rush.show_percentage = false
-	_hud_rush.max_value = 1.0
-	_hud_rush.anchor_left = 1.0
-	_hud_rush.anchor_right = 1.0
-	_hud_rush.offset_left = -300.0
-	_hud_rush.offset_right = -28.0
-	_hud_rush.offset_top = 118.0
-	_hud_rush.offset_bottom = 142.0
-	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(1, 1, 1, 0.7)
-	bg.set_corner_radius_all(12)
-	bg.border_color = Palette.PINK
-	bg.set_border_width_all(3)
-	var fill := StyleBoxFlat.new()
-	fill.bg_color = Palette.CORAL
-	fill.set_corner_radius_all(12)
-	_hud_rush.add_theme_stylebox_override("background", bg)
-	_hud_rush.add_theme_stylebox_override("fill", fill)
-	layer.add_child(_hud_rush)
-	_hud_rush_label = _label(20)
-	_hud_rush_label.anchor_left = 1.0
-	_hud_rush_label.anchor_right = 1.0
-	_hud_rush_label.offset_left = -300.0
-	_hud_rush_label.offset_right = -28.0
-	_hud_rush_label.offset_top = 144.0
-	_hud_rush_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	layer.add_child(_hud_rush_label)
-
 	_hud_board = _label(26)
 	_hud_board.anchor_left = 0.5
 	_hud_board.anchor_right = 0.5
@@ -661,6 +653,23 @@ func _setup_hud() -> void:
 	_hud_board.offset_right = 140.0
 	_hud_board.offset_top = 290.0
 	layer.add_child(_hud_board)
+
+
+## Rounded cream card behind HUD text, like the menu buttons.
+func _card() -> PanelContainer:
+	var p := PanelContainer.new()
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(1.0, 0.96, 0.88, 0.72)
+	sb.border_color = Color(Palette.PINK, 0.9)
+	sb.set_border_width_all(3)
+	sb.set_corner_radius_all(22)
+	sb.content_margin_left = 18
+	sb.content_margin_right = 18
+	sb.content_margin_top = 8
+	sb.content_margin_bottom = 10
+	p.add_theme_stylebox_override("panel", sb)
+	return p
 
 
 func _label(font_size: int) -> Label:

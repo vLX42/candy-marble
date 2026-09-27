@@ -78,6 +78,7 @@ func _instance(model: String) -> Node3D:
 		return null
 	var n: Node3D = load(path).instantiate()
 	add_child(n)
+	Terrain.no_shadows(n)
 	return n
 
 

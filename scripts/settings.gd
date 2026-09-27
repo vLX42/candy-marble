@@ -76,7 +76,7 @@ func apply_graphics(env: Environment, sun: DirectionalLight3D) -> void:
 	env.glow_enabled = graphics_high
 	if sun:
 		sun.shadow_enabled = true
-		sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if graphics_high \
+		sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if graphics_high \
 			else DirectionalLight3D.SHADOW_ORTHOGONAL
 
 
