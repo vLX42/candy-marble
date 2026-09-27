@@ -176,7 +176,7 @@ Windows, macOS (universal, ad-hoc signed), Linux and Web exports
 
 - works out the version from the commit messages since the last release
   (`tools/next_version.py`): `feat:` = minor, `fix:` and anything else = patch,
-  `feat!:` or `BREAKING` in the body = major; commits that are only `docs:`,
+  `feat!:` or a `BREAKING CHANGE:` footer line = major; commits that are only `docs:`,
   `ci:`, `test:` or `chore:` don't make a release,
 - stamps it into the builds (shown on the title screen) and the site,
 - deploys `site/` plus the web build (under `/play`) to GitHub Pages,

@@ -2,7 +2,7 @@
 
     feat: ...            -> minor bump   (1.2.3 -> 1.3.0)
     fix: ... / other     -> patch bump   (1.2.3 -> 1.2.4)
-    feat!: ... or a body with "BREAKING" -> major bump (1.2.3 -> 2.0.0)
+    feat!: ... or a "BREAKING CHANGE:" footer line -> major bump (1.2.3 -> 2.0.0)
     docs: / ci: / test: / chore: / style: only -> no release
 
 Prints shell-style lines for GitHub Actions ($GITHUB_OUTPUT):
@@ -37,7 +37,8 @@ def main():
                      subject, re.I)
         kind = m.group(1).lower() if m else "other"
         text = m.group(4) if m else subject
-        breaking = (m and m.group(3)) or "BREAKING" in body
+        # Only a real footer counts ("BREAKING CHANGE: ..." at the start of a line).
+        breaking = bool(m and m.group(3)) or re.search(r"^BREAKING[ -]CHANGE:", body, re.M) is not None
         if kind in QUIET and not breaking:
             continue
         level = 3 if breaking else 2 if kind == "feat" else 1
