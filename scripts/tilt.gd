@@ -41,8 +41,11 @@ const JS := """
 
 var _web := false
 var _tilt: JavaScriptObject
+## Tests: a fake sensor {beta, gamma, angle, n} used instead of the browser.
+var fake := {}
 var _neutral := Vector2.ZERO   # calibrated (right, down) tilt in screen space
 var _calibrated := false
+var _calibrations := 0
 var _last_n := -1
 var _fresh := 0.0
 ## Touch stick: where the finger went down and where it is now.
@@ -79,18 +82,31 @@ func is_portrait() -> bool:
 
 ## True on phones and tablets (touch screen, no need for a keyboard).
 func is_touch() -> bool:
-	return DisplayServer.is_touchscreen_available()
+	return DisplayServer.is_touchscreen_available() or not fake.is_empty()
 
 
 ## Tilt readings are arriving from the phone.
 func active() -> bool:
-	return _web and _tilt != null and _fresh > 0.0 and Settings.control_mode == "tilt"
+	return _has_source() and _fresh > 0.0 and Settings.control_mode == "tilt"
+
+
+func _has_source() -> bool:
+	return not fake.is_empty() or (_web and _tilt != null)
+
+
+## Latest reading as [beta, gamma, angle, count].
+func _read() -> Array:
+	if not fake.is_empty():
+		return [float(fake.beta), float(fake.gamma), int(fake.get("angle", 0)), int(fake.n)]
+	if _web and _tilt != null:
+		return [float(_tilt.beta), float(_tilt.gamma), int(_tilt.angle), int(_tilt.n)]
+	return [0.0, 0.0, 0, 0]
 
 
 func _process(delta: float) -> void:
 	_fresh = maxf(0.0, _fresh - delta)
-	if _web and _tilt:
-		var n: int = int(_tilt.n)
+	if _has_source():
+		var n: int = _read()[3]
 		if n != _last_n:
 			_last_n = n
 			_fresh = 1.0
@@ -100,9 +116,10 @@ func _process(delta: float) -> void:
 
 ## Raw tilt mapped to screen space: x = right edge down, y = top edge towards you.
 func _screen_tilt() -> Vector2:
-	if _tilt == null:
+	if not _has_source():
 		return Vector2.ZERO
-	return screen_tilt(float(_tilt.beta), float(_tilt.gamma), int(_tilt.angle))
+	var r := _read()
+	return screen_tilt(r[0], r[1], r[2])
 
 
 ## Device beta / gamma (degrees) and screen rotation angle -> screen-space tilt.
@@ -121,7 +138,8 @@ static func screen_tilt(beta: float, gamma: float, angle: int) -> Vector2:
 ## Remember how the phone is held right now as "flat".
 func calibrate() -> void:
 	_neutral = _screen_tilt()
-	_calibrated = _tilt != null and int(_tilt.n) > 0
+	_calibrations += 1
+	_calibrated = _has_source() and _read()[3] > 0
 
 
 ## Direction to roll, length 0..1, in screen space (y down).
@@ -189,6 +207,12 @@ func report(pos: Vector3, level_time: float, input: Vector2) -> void:
 	_tilt.active = active()
 	_tilt.inx = input.x
 	_tilt.iny = input.y
+	var raw := _screen_tilt()
+	_tilt.rawx = raw.x
+	_tilt.rawy = raw.y
+	_tilt.neutx = _neutral.x
+	_tilt.neuty = _neutral.y
+	_tilt.calibs = _calibrations
 
 
 ## Tilt data asked for but not allowed (iPhone "Don't allow").

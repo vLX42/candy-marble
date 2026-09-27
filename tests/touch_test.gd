@@ -59,7 +59,7 @@ func _process(delta: float) -> bool:
 				_check("stick reads a drag", tl.stick_vector().y < -0.9, str(tl.stick_vector()))
 				phase = 1
 		1:
-			# The game's touch input only runs on touch screens; drive it here.
+			# The game's touch input only runs on touch screens; drive the stick here.
 			var v: Vector2 = tl.stick_vector()
 			main._touch_press("up", -v.y)
 			if t > 2.0:
@@ -73,6 +73,30 @@ func _process(delta: float) -> bool:
 				up.pressed = false
 				tl.handle_touch(up)
 				_check("lifting the finger stops the stick", tl.stick_vector() == Vector2.ZERO, "")
+				# Tilt through the real game: phone held at 40 degrees, upright.
+				root.get_node("Settings").control_mode = "tilt"
+				tl.fake = {beta = 40.0, gamma = 0.0, angle = 0, n = 1}
+				main.countdown = true
+				main.start_level(0)
+				phase = 2
+				t = 0.0
+		2:
+			tl.fake.n += 1
+			if main.level_time > 0.3 and not has_meta("rest"):
+				set_meta("rest", true)
+				var v: Vector2 = tl.vector()
+				_check("resting tilt is calibrated to zero", v == Vector2.ZERO, str(v))
+				start = main.ball.global_position
+				tl.fake.beta = 25.0   # tip the top edge away
+			if has_meta("rest") and main.level_time > 2.0:
+				var v2: Vector2 = tl.vector()
+				_check("tipping forward rolls up the screen", v2.y < -0.7 and absf(v2.x) < 0.01, str(v2))
+				var moved: Vector3 = main.ball.global_position - start
+				var cam_fwd: Vector3 = -main.camera.global_basis.z
+				cam_fwd.y = 0.0
+				_check("the marble follows the tilt", moved.dot(cam_fwd.normalized()) > 2.0,
+					"moved %.2f along the view" % moved.dot(cam_fwd.normalized()))
+				tl.fake = {}
 				print("\n".join(results))
 				print("TOUCH TEST ", "FAILED" if failed else "PASSED")
 				quit(1 if failed else 0)
