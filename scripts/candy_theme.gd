@@ -112,6 +112,13 @@ static func make(size: int = 38) -> Theme:
 	t.set_color("font_color", "ItemList", CandyText.CHOCOLATE)
 	t.set_color("font_selected_color", "ItemList", CandyText.CHOCOLATE)
 	t.set_color("font_hovered_color", "ItemList", CandyText.CHOCOLATE)
+	# Every state, so no default white-on-light combination can show through.
+	t.set_color("font_hovered_selected_color", "ItemList", CandyText.CHOCOLATE)
+	var sel_hover := _box(Color("#8EDDB6"), Color("#4FB58A"), 2, 8)
+	t.set_stylebox("hovered_selected", "ItemList", sel_hover)
+	t.set_stylebox("hovered_selected_focus", "ItemList", sel_hover)
+	t.set_stylebox("cursor", "ItemList", StyleBoxEmpty.new())
+	t.set_stylebox("cursor_unfocused", "ItemList", StyleBoxEmpty.new())
 
 	var tab := _box(Color("#F6E6EC"), Palette.PINK, 3, 12)
 	tab.content_margin_left = 14
