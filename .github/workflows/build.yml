@@ -52,6 +52,7 @@ jobs:
           set -e
           godot --headless --fixed-fps 120 -s tests/levels_test.gd
           godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/marble_madness.json
+          godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/madness_returns.json
           godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/sweet_starter.json
 
   version:

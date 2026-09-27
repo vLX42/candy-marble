@@ -152,6 +152,11 @@ The shipped **Marble Madness** quest (`quests/marble_madness.json`, built by
 `tools/make_madness_quest.py`) has six races, each ending on a GOAL pad:
 Spiral Summit, Terrace Falls (steelie, slime, pipe), Goo Gorge (acid alley),
 Sky Catwalks (ice), Silly Race and Ultimate Madness (a race over ice and slime).
+The **Madness Returns** quest (`quests/madness_returns.json`, built by
+`tools/make_madness2_quest.py`) adds five more after the arcade races:
+Checker Slope (practice), Muncher Mill (munchers, a button bridge, a pipe),
+Hammer Heights (hammers and timed bridges that sink again), Upside Hill (Silly)
+and Wave Machine (a race over waves, ice and a booster chute).
 `tools/preview_quest.gd` renders a 3D overview of every level in a quest.
 
 Shared files are data only: every field is checked and clamped
@@ -218,6 +223,7 @@ godot --headless --fixed-fps 120 -s tests/madness_test.gd  # hard landings, goo,
 godot --headless --fixed-fps 120 -s tests/flow_test.gd     # countdown, pause, ghost replay, test from here
 godot --headless --fixed-fps 120 -s tests/original_test.gd # pipe, ice, slime, steelie, GOAL pad, silly, arcade clock
 godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/marble_madness.json
+godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/madness_returns.json
 godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --cam     # how much the follow camera turns
 godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --remix   # built-in levels after a trip through the quest format
 godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/sweet_starter.json

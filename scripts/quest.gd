@@ -174,7 +174,8 @@ static func install_file(file_path: String) -> Quest:
 
 
 ## Sample quests shipped with the game, installed once (deleting them sticks).
-const SAMPLES := ["res://quests/sweet_starter.json", "res://quests/marble_madness.json"]
+const SAMPLES := ["res://quests/sweet_starter.json", "res://quests/marble_madness.json",
+	"res://quests/madness_returns.json"]
 
 
 ## Installs each shipped sample once (a deleted sample stays deleted).
