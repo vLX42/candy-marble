@@ -212,13 +212,13 @@ func _play(level: int) -> void:
 	MainGame.quest = _current
 	MainGame.test_mode = false
 	MainGame.requested_level = level
-	get_tree().change_scene_to_file("res://scenes/main.tscn")
+	Transition.go("res://scenes/main.tscn")
 
 
 func _edit(q: Quest) -> void:
 	LevelEditor.session_quest = q
 	LevelEditor.session_level = 0
-	get_tree().change_scene_to_file("res://scenes/editor.tscn")
+	Transition.go("res://scenes/editor.tscn")
 
 
 func _new_quest() -> void:

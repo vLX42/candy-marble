@@ -43,6 +43,8 @@ var _pause: PanelContainer
 var _pause_box: VBoxContainer
 
 signal pause_action(action: String)
+## A results chip just stamped in (main plays a chime).
+signal stamp
 
 
 func _ready() -> void:
@@ -189,6 +191,63 @@ func show_results(r: Dictionary) -> void:
 	var tw := create_tween().set_parallel()
 	tw.tween_property(_results, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_property(_results, "modulate:a", 1.0, 0.2)
+	# The time counts up, then the chips stamp in one by one.
+	if r.has("time"):
+		var final: float = r.time
+		var count := create_tween()
+		count.tween_method(func(v: float) -> void: _res_time.text = "%.2f s" % v, 0.0, final, 0.6) \
+			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	var chips := _res_chips.get_children()
+	for k in chips.size():
+		var c: Control = chips[k]
+		c.modulate.a = 0.0
+		var st := create_tween()
+		st.tween_interval(0.65 + 0.22 * k)
+		st.tween_callback(func() -> void:
+			c.pivot_offset = c.size * 0.5
+			c.scale = Vector2(1.8, 1.8)
+			c.modulate.a = 1.0
+			stamp.emit())
+		st.tween_property(c, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if r.get("confetti", false):
+		var cf := create_tween()
+		cf.tween_interval(0.65)
+		cf.tween_callback(_confetti)
+
+
+## Pastel confetti bursting out of the top of the results card.
+func _confetti() -> void:
+	for side in [-1.0, 1.0]:
+		var p := CPUParticles2D.new()
+		p.amount = 70
+		p.one_shot = true
+		p.explosiveness = 0.9
+		p.lifetime = 2.2
+		p.direction = Vector2(0.35 * side, -1.0)
+		p.spread = 35.0
+		p.initial_velocity_min = 420.0
+		p.initial_velocity_max = 780.0
+		p.gravity = Vector2(0, 900)
+		p.damping_min = 40.0
+		p.damping_max = 90.0
+		p.angular_velocity_min = -540.0
+		p.angular_velocity_max = 540.0
+		p.scale_amount_min = 6.0
+		p.scale_amount_max = 11.0
+		var g := Gradient.new()
+		g.interpolation_mode = Gradient.GRADIENT_INTERPOLATE_CONSTANT
+		g.offsets = PackedFloat32Array([0.0, 0.2, 0.4, 0.6, 0.8])
+		g.colors = PackedColorArray(CandyText.PASTELS)
+		p.color_initial_ramp = g
+		var fade := Gradient.new()
+		fade.set_color(0, Color.WHITE)
+		fade.add_point(0.75, Color.WHITE)
+		fade.set_color(fade.get_point_count() - 1, Color(1, 1, 1, 0))
+		p.color_ramp = fade
+		add_child(p)
+		p.position = _results.global_position + Vector2(_results.size.x * (0.5 + 0.3 * side), 10)
+		p.emitting = true
+		p.finished.connect(p.queue_free)
 
 
 func hide_results() -> void:

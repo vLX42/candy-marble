@@ -1429,13 +1429,13 @@ func test_play(from: Vector2i = Vector2i(-1, -1)) -> void:
 	MainGame.test_mode = true
 	MainGame.test_start = from
 	MainGame.requested_level = li
-	get_tree().change_scene_to_file("res://scenes/main.tscn")
+	Transition.go("res://scenes/main.tscn")
 
 
 func exit_to_menu() -> void:
 	quest.save()
 	TitleScreen.open_page = "quests"
-	get_tree().change_scene_to_file("res://scenes/title.tscn")
+	Transition.go("res://scenes/title.tscn")
 
 
 func _on_files_dropped(files: PackedStringArray) -> void:

@@ -225,8 +225,30 @@ func _build_ui() -> void:
 	_quests.visible = false
 	_quests.closed.connect(_show_menu)
 	root.add_child(_quests)
+	_intro(logo, sub)
 
 	play.grab_focus()
+
+
+## Logo drops in with a bounce, then the menu buttons pop in one by one.
+func _intro(logo: Control, sub: Control) -> void:
+	var end := logo.position
+	logo.position = end - Vector2(0, 360)
+	var tw := create_tween()
+	tw.tween_property(logo, "position", end, 0.7).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+	sub.modulate.a = 0.0
+	create_tween().tween_property(sub, "modulate:a", 1.0, 0.4).set_delay(0.5)
+	var k := 0
+	for c in _menu.get_children():
+		var item := c as Control
+		item.modulate.a = 0.0
+		item.pivot_offset = Vector2(40, 24)
+		item.scale = Vector2(0.85, 0.85)
+		var t := create_tween().set_parallel()
+		t.tween_property(item, "modulate:a", 1.0, 0.25).set_delay(0.35 + 0.06 * k)
+		t.tween_property(item, "scale", Vector2.ONE, 0.35).set_delay(0.35 + 0.06 * k) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		k += 1
 
 
 func _setup_theme() -> void:
@@ -271,7 +293,7 @@ func _open_editor() -> void:
 	var installed := Quest.list_installed()
 	LevelEditor.session_quest = installed[0] if not installed.is_empty() else null
 	LevelEditor.session_level = 0
-	get_tree().change_scene_to_file("res://scenes/editor.tscn")
+	Transition.go("res://scenes/editor.tscn")
 
 
 func _show_levels() -> void:
@@ -305,7 +327,7 @@ func _start(index: int) -> void:
 	MainGame.quest = null
 	MainGame.test_mode = false
 	MainGame.requested_level = index
-	get_tree().change_scene_to_file("res://scenes/main.tscn")
+	Transition.go("res://scenes/main.tscn")
 
 
 func _unhandled_input(event: InputEvent) -> void:

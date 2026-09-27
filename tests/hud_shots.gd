@@ -24,6 +24,7 @@ func _initialize() -> void:
 	main = load("res://scenes/main.tscn").instantiate()
 	main.auto_advance = false
 	main.save_scores = false
+	main.countdown = false
 	root.add_child(main)
 	DirAccess.make_dir_recursive_absolute("res://tests/shots")
 

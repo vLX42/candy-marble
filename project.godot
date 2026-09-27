@@ -18,6 +18,8 @@ config/features=PackedStringArray("4.7", "Forward Plus")
 [autoload]
 
 Settings="*res://scripts/settings.gd"
+Transition="*res://scripts/transition.gd"
+UiSound="*res://scripts/ui_sound.gd"
 
 [display]
 

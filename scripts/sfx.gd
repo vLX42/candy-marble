@@ -1,12 +1,18 @@
 class_name Sfx
 extends Node
-## Tiny synthesized sound effects, so the prototype has audio without assets.
-## Replace with real samples later by swapping the streams in _ready().
+## Sound effects. Uses the designed sounds in audio/sfx/*.wav (made by
+## tools/make_sfx.py) and falls back to tiny synthesized ones. Every play gets
+## a slightly random pitch so repeated sounds don't feel mechanical. Also runs
+## the marble's rolling loop.
 
 const RATE := 22050
+const FILES := ["roll", "land", "bonk", "pop", "splat", "boing", "boost", "checkpoint", "goal", "timeup",
+	"tick", "go", "ui_hover", "ui_click", "ui_back", "coin", "cannon", "rush", "goo", "whoosh"]
 
 var _streams := {}
 var _players: Array[AudioStreamPlayer] = []
+var _roll: AudioStreamPlayer
+var _roll_level := 0.0
 
 
 func _ready() -> void:
@@ -20,20 +26,63 @@ func _ready() -> void:
 		"tick": _wav(_sweep(0.04, 1200.0, 1200.0, "sine")),
 		"coin": _wav(_notes([1319.0, 1760.0], 0.06)),
 	}
-	for i in 8:
+	for n: String in FILES:
+		var path := "res://audio/sfx/%s.wav" % n
+		if ResourceLoader.exists(path):
+			_streams[n] = load(path)
+	for i in 12:
 		var p := AudioStreamPlayer.new()
 		p.bus = "SFX"
 		add_child(p)
 		_players.append(p)
+	if _streams.has("roll"):
+		var loop: AudioStreamWAV = (_streams.roll as AudioStreamWAV).duplicate()
+		loop.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		loop.loop_begin = 0
+		loop.loop_end = loop.data.size() / 2
+		_roll = AudioStreamPlayer.new()
+		_roll.stream = loop
+		_roll.bus = "SFX"
+		_roll.volume_db = -60.0
+		add_child(_roll)
 
 
-func play(sound: String, volume_db: float = -6.0) -> void:
+func has(sound: String) -> bool:
+	return _streams.has(sound)
+
+
+func play(sound: String, volume_db: float = -6.0, pitch_spread: float = 0.06) -> void:
+	if not _streams.has(sound):
+		return
 	for p in _players:
 		if not p.playing:
 			p.stream = _streams[sound]
 			p.volume_db = volume_db
+			p.pitch_scale = 1.0 + randf_range(-pitch_spread, pitch_spread)
 			p.play()
 			return
+
+
+## Rolling rumble: louder and higher the faster the marble rolls on the ground.
+func set_roll(speed: float, grounded: bool, delta: float) -> void:
+	if _roll == null:
+		return
+	var target := clampf(speed / 9.0, 0.0, 1.0) if grounded else 0.0
+	_roll_level = move_toward(_roll_level, target, delta * (6.0 if target > _roll_level else 3.0))
+	if _roll_level < 0.02:
+		if _roll.playing:
+			_roll.stop()
+		return
+	if not _roll.playing:
+		_roll.play()
+	_roll.volume_db = linear_to_db(_roll_level * 0.8)
+	_roll.pitch_scale = 0.75 + _roll_level * 0.6
+
+
+func stop_roll() -> void:
+	_roll_level = 0.0
+	if _roll:
+		_roll.stop()
 
 
 func _sweep(dur: float, f0: float, f1: float, wave: String, vibrato: float = 0.0) -> PackedFloat32Array:

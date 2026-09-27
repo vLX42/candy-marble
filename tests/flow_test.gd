@@ -10,6 +10,7 @@ var phase_start := 0.0
 var results: Array[String] = []
 var failed := false
 var mark := 0.0
+var once := false
 
 
 func _initialize() -> void:
@@ -35,17 +36,34 @@ func _process(delta: float) -> bool:
 	match phase:
 		0:
 			if pt > 0.5:
-				_check("countdown holds the clock", main.level_time == 0.0 and main.ball.input_lock > 0.0,
-					"time %.2f lock %.2f" % [main.level_time, main.ball.input_lock])
+				_check("course flyover plays first", main._fly_left > 0.0 and main.level_time == 0.0 and main.ball.input_lock > 2.4,
+					"fly %.2f lock %.2f" % [main._fly_left, main.ball.input_lock])
+				Input.action_press("up")
 				_next()
 		1:
-			if pt > 2.5:
-				_check("GO starts the clock", main.level_time > 0.5, "time %.2f" % main.level_time)
-				Input.action_press("pause")
+			Input.action_release("up")
+			if pt > 0.1 and mark == 0.0:
+				mark = 1.0
+				_check("any direction skips the flyover", main._fly_left == 0.0, "%.2f" % main._fly_left)
+			if pt > 0.5 and mark == 1.0:
+				mark = 2.0
+				_check("countdown holds the clock", main.level_time == 0.0 and main.ball.input_lock > 0.0,
+					"time %.2f lock %.2f" % [main.level_time, main.ball.input_lock])
+			if pt > 3.0:
+				_check("GO starts the clock", main.level_time > 0.4, "time %.2f" % main.level_time)
+				main.start_level(0)
+				_check("restart skips the flyover", main._fly_left == 0.0, "%.2f" % main._fly_left)
+				main._count_left = 0.0
+				main.ball.input_lock = 0.0
 				_next()
 		2:
+			if pt > 0.5:
+				Input.action_press("pause")
+				_next()
+		3:
 			Input.action_release("pause")
-			if pt > 0.2 and mark == 0.0:
+			if pt > 0.2 and not once:
+				once = true
 				mark = main.level_time
 				_check("Esc pauses and shows the menu", paused and main.hud.is_paused_visible(), "paused %s" % paused)
 			if pt > 1.2:
@@ -53,7 +71,7 @@ func _process(delta: float) -> bool:
 				main._on_pause_action("resume")
 				_check("resume unpauses", not paused and not main.hud.is_paused_visible(), "")
 				_next()
-		3:
+		4:
 			if pt > 0.5:
 				_check("clock runs again", main.level_time > mark, "%.2f" % main.level_time)
 				# Ghost: save a straight-line run, reload, and watch it replay.

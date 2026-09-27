@@ -6,6 +6,10 @@ extends RigidBody3D
 
 signal died
 signal respawned
+## Hit the ground after a fall (impact = downward speed).
+signal landed(impact: float)
+## Knocked into a wall or block (impact = speed lost).
+signal bonked(impact: float)
 
 @export var push_force := 16.0
 @export var max_speed := 8.0
@@ -34,6 +38,8 @@ var _glow: OmniLight3D
 var _flying := false
 ## Highest point since the marble last touched something (for break_drop).
 var _air_top := -INF
+var _prev_vel := Vector3.ZERO
+var _knock_cool := 0.0
 
 
 func _ready() -> void:
@@ -79,6 +85,7 @@ func _physics_process(_delta: float) -> void:
 		return
 
 	_check_landing()
+	_check_impacts(_delta)
 	if _flying and input_lock <= 0.0 and get_contact_count() > 0:
 		_flying = false
 		linear_damp_mode = RigidBody3D.DAMP_MODE_COMBINE
@@ -158,6 +165,21 @@ func _screen_to_world(input: Vector2) -> Vector3:
 	var right := Vector3(cam_basis.x.x, 0.0, cam_basis.x.z).normalized()
 	var back := Vector3(cam_basis.z.x, 0.0, cam_basis.z.z).normalized()
 	return (right * input.x + back * input.y).limit_length(1.0)
+
+
+func _check_impacts(delta: float) -> void:
+	_knock_cool -= delta
+	var v := linear_velocity
+	var hit := get_contact_count() > 0
+	if hit and _prev_vel.y < -3.0 and v.y - _prev_vel.y > 2.5 and _knock_cool <= 0.0:
+		_knock_cool = 0.15
+		landed.emit(-_prev_vel.y)
+	var h0 := Vector2(_prev_vel.x, _prev_vel.z).length()
+	var h1 := Vector2(v.x, v.z).length()
+	if hit and h0 - h1 > 2.5 and _knock_cool <= 0.0:
+		_knock_cool = 0.15
+		bonked.emit(h0 - h1)
+	_prev_vel = v
 
 
 func _check_landing() -> void:

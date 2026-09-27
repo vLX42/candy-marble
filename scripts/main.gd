@@ -71,6 +71,10 @@ static var test_start := Vector2i(-1, -1)
 @export var countdown := true
 
 const COUNT_TIME := 2.4
+## Course preview: the camera glides from the flag back to the start.
+const FLY_TIME := 3.2
+var _fly_left := 0.0
+var _flown := ""
 ## Best-run ghost: position samples every GHOST_DT seconds of level time.
 const GHOST_DT := 0.05
 var _count_left := 0.0
@@ -202,6 +206,9 @@ func load_level(data: LevelBase) -> void:
 		ball.position = ground(level.tile_center(test_start.x, test_start.y)) + Vector3.UP * 0.6
 	world.add_child(ball)
 	ball.died.connect(_on_ball_died)
+	ball.landed.connect(_on_ball_landed)
+	ball.bonked.connect(func(impact: float) -> void:
+		sfx.play("bonk", clampf(-20.0 + impact * 2.5, -20.0, -4.0), 0.12))
 	ball.break_drop = level.break_drop * level.step + 0.3 if level.break_drop > 0 else 0.0
 	rival = null
 	race_lost = false
@@ -236,10 +243,19 @@ func load_level(data: LevelBase) -> void:
 	show_message(intro, 3.0)
 	_count_left = COUNT_TIME if countdown else 0.0
 	_count_shown = ""
+	# Fly over the course the first time a level loads (not on restarts).
+	var id := _score_key()
+	_fly_left = FLY_TIME if countdown and _flown != id and _route_world.size() >= 2 else 0.0
+	_flown = id
+	if _fly_left > 0.0:
+		_cam_yaw = deg_to_rad(45.0)
+		camera.rotation = Vector3(deg_to_rad(CAMERA_ROTATION.x), _cam_yaw, 0.0)
+		camera.global_position = _camera_target()
+		camera.size = Settings.camera_size() * 1.35
 	if _count_left > 0.0:
-		ball.input_lock = _count_left
+		ball.input_lock = _count_left + _fly_left
 		if rival:
-			rival.set("_wait", _count_left)
+			rival.set("_wait", _count_left + _fly_left)
 	_ghost_rec = PackedVector3Array()
 	_setup_ghost()
 
@@ -294,18 +310,32 @@ func _run_key() -> String:
 func _process(delta: float) -> void:
 	if _handle_pause():
 		return
-	if _count_left > 0.0:
+	if _fly_left > 0.0:
+		_fly_left -= delta
+		for a in ["up", "down", "left", "right"]:
+			if Input.is_action_just_pressed(a):
+				_fly_left = 0.0
+		if _fly_left <= 0.0:
+			_fly_left = 0.0
+			ball.input_lock = _count_left
+			if rival:
+				rival.set("_wait", _count_left)
+	elif _count_left > 0.0:
 		_count_left -= delta
 		var n := "GO!" if _count_left <= 0.0 else str(ceili(_count_left / (COUNT_TIME / 3.0)))
 		if n != _count_shown:
 			_count_shown = n
 			hud.show_count(n)
-			sfx.play("checkpoint" if n == "GO!" else "boing", -8.0 if n == "GO!" else -14.0)
+			sfx.play("go" if n == "GO!" else "tick", -4.0 if n == "GO!" else -8.0, 0.0)
 	elif not finished and not game_complete:
 		total_time += delta
 		level_time += delta
 		_record_ghost()
 	_update_ghost()
+	if ball and ball.alive and not finished:
+		sfx.set_roll(Vector2(ball.linear_velocity.x, ball.linear_velocity.z).length(), ball.is_grounded(), delta)
+	else:
+		sfx.set_roll(0.0, false, delta)
 	var place := "1st" if race_position() == 1 else "2nd"
 	if race_lost:
 		place = "LOST"
@@ -313,9 +343,12 @@ func _process(delta: float) -> void:
 	_update_rush(delta)
 
 	var target_yaw := _track_yaw() if Settings.camera_follow else deg_to_rad(45.0)
+	if _fly_left > 0.0:
+		target_yaw = deg_to_rad(45.0)
 	_cam_yaw = lerp_angle(_cam_yaw, target_yaw, 1.0 - exp(-CAMERA_TURN * delta))
 	camera.rotation = Vector3(deg_to_rad(CAMERA_ROTATION.x), _cam_yaw, 0.0)
-	camera.size = lerpf(camera.size, Settings.camera_size(), 1.0 - exp(-3.0 * delta))
+	var want_size := Settings.camera_size() * (1.35 if _fly_left > 0.0 else 1.0)
+	camera.size = lerpf(camera.size, want_size, 1.0 - exp(-3.0 * delta))
 	var k := 1.0 - exp(-CAMERA_FOLLOW * delta)
 	camera.global_position = camera.global_position.lerp(_camera_target(), k)
 	if _shake > 0.0:
@@ -348,6 +381,8 @@ func _restart() -> void:
 ## Esc / Start pauses mid-level. Returns true while paused.
 func _handle_pause() -> bool:
 	var tree := get_tree()
+	if tree.paused:
+		sfx.stop_roll()
 	if Input.is_action_just_pressed("pause") and not finished and not game_complete:
 		if tree.paused:
 			_resume()
@@ -389,12 +424,12 @@ func _leave() -> void:
 		test_mode = false
 		test_start = Vector2i(-1, -1)
 		quest = null
-		get_tree().change_scene_to_file("res://scenes/editor.tscn")
+		Transition.go("res://scenes/editor.tscn")
 	else:
 		if quest:
 			TitleScreen.open_page = "quests"
 		quest = null
-		get_tree().change_scene_to_file("res://scenes/title.tscn")
+		Transition.go("res://scenes/title.tscn")
 
 
 # --- Best-run ghost -----------------------------------------------------------
@@ -474,7 +509,7 @@ func charge(amount: float, at: Vector3) -> void:
 		rush_meter = 0.0
 		rush_left = RUSH_TIME
 		ball.rush = true
-		sfx.play("boost")
+		sfx.play("rush" if sfx.has("rush") else "boost")
 		cheer("SUGAR RUSH!", ball.global_position + Vector3.UP * 2.2)
 		if _music:
 			_music.pitch_scale = 1.08
@@ -537,7 +572,18 @@ func _route_point(progress: float) -> Vector2:
 
 
 func _camera_target() -> Vector3:
-	return ball.global_position + camera.global_basis.z * 40.0
+	return _camera_focus() + camera.global_basis.z * 40.0
+
+
+## What the camera looks at: the marble, or the flyover point along the route.
+func _camera_focus() -> Vector3:
+	if _fly_left <= 0.0 or _route_world.size() < 2:
+		return ball.global_position
+	# Ease from the flag (route end) back to the start.
+	var u := 1.0 - _fly_left / FLY_TIME
+	u = u * u * (3.0 - 2.0 * u)
+	var p := _route_point((_route_world.size() - 1) * (1.0 - u))
+	return Vector3(p.x, level.height(p.x, p.y), p.y)
 
 
 # --- Events -----------------------------------------------------------------
@@ -550,8 +596,51 @@ func _on_ball_died() -> void:
 	_shake = 0.3
 
 
+func _on_ball_landed(impact: float) -> void:
+	sfx.play("land", clampf(-22.0 + impact * 1.6, -22.0, -3.0), 0.1)
+	if impact > 5.0:
+		dust(ball.global_position - Vector3.UP * 0.45, clampf(impact / 12.0, 0.3, 1.0))
+		_shake = maxf(_shake, clampf(impact * 0.012, 0.0, 0.18))
+
+
+## Candy-dust puff where the marble lands.
+func dust(pos: Vector3, amount: float) -> void:
+	var p := CPUParticles3D.new()
+	var mesh := Palette.sphere(0.12)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(1, 0.97, 0.93, 0.85)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.vertex_color_use_as_albedo = true
+	mesh.material = mat
+	p.mesh = mesh
+	p.one_shot = true
+	p.explosiveness = 0.95
+	p.amount = int(10 + 16 * amount)
+	p.lifetime = 0.55
+	p.direction = Vector3.UP
+	p.spread = 85.0
+	p.flatness = 0.7
+	p.initial_velocity_min = 1.5
+	p.initial_velocity_max = 3.5 * amount + 1.5
+	p.gravity = Vector3(0, -3, 0)
+	p.damping_min = 3.0
+	p.damping_max = 5.0
+	p.scale_amount_min = 0.6
+	p.scale_amount_max = 1.6
+	var fade := Gradient.new()
+	fade.set_color(0, Color(1, 1, 1, 0.9))
+	fade.set_color(1, Color(1, 1, 1, 0.0))
+	p.color_ramp = fade
+	world.add_child(p)
+	p.global_position = pos
+	p.emitting = true
+	p.finished.connect(p.queue_free)
+
+
 func _on_goal() -> void:
-	if finished:
+	# Nothing counts before GO (the marble can't move then anyway).
+	if finished or _fly_left > 0.0 or _count_left > 0.0:
 		return
 	finished = true
 	if race_lost:
@@ -579,6 +668,7 @@ func _on_goal() -> void:
 		info = "Par %.0f s   Falls %d" % [level.time_limit, level_falls],
 		board_title = "BEST TIMES", board = scores.top(_score_key()), highlight = rank,
 		hint = "Next level coming up...      R  retry" if auto_advance else "R  retry      Esc  menu",
+		confetti = rank == 0 or medal == "GOLD",
 	}
 	if test_mode:
 		res.hint = "R  retry      Esc  back to the editor"
@@ -617,6 +707,12 @@ func _update_best_label() -> void:
 	hud.set_best(best)
 
 
+## Positional-ish one-shot for toys: quieter the further from the marble.
+func play_sound(sound: String, at: Vector3) -> void:
+	var d := at.distance_to(ball.global_position) if ball else 0.0
+	sfx.play(sound, clampf(-4.0 - d * 0.8, -26.0, -4.0))
+
+
 func on_bump(pos: Vector3) -> void:
 	sfx.play("boing")
 	_shake = maxf(_shake, 0.12)
@@ -640,8 +736,17 @@ func on_checkpoint(_pos: Vector3) -> void:
 	show_message("Checkpoint!", 1.2)
 
 
+## Sound for each shout (monsters, toys and hazards announce themselves).
+const CHEER_SOUNDS := {"SPLAT!": "splat", "SOUR!": "goo", "WHOOSH!": "whoosh", "LOOP!": "whoosh",
+	"WHEEE!": "whoosh", "SWAT!": "bonk", "ALL STARS!": "coin", "TARGETS!": "coin", "HOOP!": "coin",
+	"BOOM": "cannon", "BOOM!": "cannon"}
+
+
 ## Little floating shout for fun moments (loops, cannons, medals).
 func cheer(text: String, at: Vector3) -> void:
+	if CHEER_SOUNDS.has(text):
+		var d := at.distance_to(ball.global_position) if ball else 0.0
+		sfx.play(CHEER_SOUNDS[text], clampf(-2.0 - d * 0.8, -24.0, -2.0))
 	_popup(text, at, CandyText.PASTELS[2], 1.3)
 
 
@@ -800,3 +905,4 @@ func _setup_camera() -> void:
 func _setup_hud() -> void:
 	hud = Hud.new()
 	add_child(hud)
+	hud.stamp.connect(func() -> void: sfx.play("coin", -9.0, 0.1))
