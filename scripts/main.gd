@@ -352,6 +352,8 @@ func _process(delta: float) -> void:
 		target_yaw = deg_to_rad(45.0)
 	_cam_yaw = lerp_angle(_cam_yaw, target_yaw, 1.0 - exp(-CAMERA_TURN * delta))
 	camera.rotation = Vector3(deg_to_rad(CAMERA_ROTATION.x), _cam_yaw, 0.0)
+	# Upright phones: keep the track's width in view and show more road ahead.
+	camera.keep_aspect = Camera3D.KEEP_WIDTH if Tilt.is_portrait() else Camera3D.KEEP_HEIGHT
 	var want_size := Settings.camera_size() * (1.35 if _fly_left > 0.0 else 1.0)
 	camera.size = lerpf(camera.size, want_size, 1.0 - exp(-3.0 * delta))
 	var k := 1.0 - exp(-CAMERA_FOLLOW * delta)

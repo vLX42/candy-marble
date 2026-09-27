@@ -54,9 +54,27 @@ var _stick_pos := Vector2.ZERO
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_web = OS.has_feature("web")
+	# Phones held upright: lay the UI out for a 900 wide screen so it scales
+	# by the short side, like in landscape.
+	get_tree().root.size_changed.connect(_fit_orientation)
+	_fit_orientation()
 	if _web:
 		JavaScriptBridge.eval(JS, true)
 		_tilt = JavaScriptBridge.get_interface("candyTilt")
+
+
+func _fit_orientation() -> void:
+	var root := get_tree().root
+	var s := root.size
+	var want := Vector2i(900, 1600) if s.y > s.x else Vector2i(1600, 900)
+	if root.content_scale_size != want:
+		root.content_scale_size = want
+
+
+## The screen is taller than wide (phone held upright).
+func is_portrait() -> bool:
+	var s := get_tree().root.size
+	return s.y > s.x
 
 
 ## True on phones and tablets (touch screen, no need for a keyboard).

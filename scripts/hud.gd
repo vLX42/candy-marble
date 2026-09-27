@@ -534,6 +534,12 @@ func _set_toast(text: String) -> void:
 	_toast_title.text = "[center]%s[/center]" % CandyText.rainbow(lines[0])
 	_toast_sub.text = "\n".join(lines.slice(1))
 	_toast_sub.visible = lines.size() > 1
+	# Wrap long sublines on narrow (upright phone) screens.
+	var room := get_viewport().get_visible_rect().size.x - 120.0
+	var font := _toast_sub.get_theme_font("font")
+	var wide := font.get_string_size(_toast_sub.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x if font else 0.0
+	_toast_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if wide > room else TextServer.AUTOWRAP_OFF
+	_toast_sub.custom_minimum_size.x = minf(wide, room) if wide > room else 0.0
 	_toast.visible = true
 	_toast.pivot_offset = _toast.size * 0.5
 	_toast.modulate.a = 0.0
