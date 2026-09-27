@@ -45,6 +45,7 @@ var _size_caption: Label
 var _tool_name: Label
 var _pieces_note: Label
 var _piece_buttons := {}
+var _facing: Label
 var _probs_box: VBoxContainer
 
 
@@ -313,7 +314,7 @@ func _build_help() -> void:
 	var right := [
 		["0 - 9", "ground height"],
 		["[ and ]", "brush size"],
-		["R  (Shift+R)", "turn 90 (45) degrees"],
+		["R  (Shift+R)", "turn 90 (45) degrees; pieces: right (left)"],
 		["Shift + click", "place on half tiles"],
 		["Del", "delete the selected thing"],
 		["Ctrl+D", "duplicate it"],
@@ -680,6 +681,17 @@ func _build_pieces(box: VBoxContainer) -> void:
 	_pieces_note = _label("", true)
 	_pieces_note.add_theme_font_size_override("font_size", 17)
 	box.add_child(_pieces_note)
+	# Turn the piece before clicking it onto the map.
+	var turn := HBoxContainer.new()
+	turn.add_theme_constant_override("separation", 6)
+	box.add_child(turn)
+	turn.add_child(_btn("Turn left", func() -> void: ed.turn_section(-1), "Shift+R"))
+	_facing = _label("")
+	_facing.add_theme_font_override("font", CandyText.FONT_BOLD)
+	_facing.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_facing.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	turn.add_child(_facing)
+	turn.add_child(_btn("Turn right", func() -> void: ed.turn_section(1), "R or right click"))
 	var g := GridContainer.new()
 	g.columns = 4
 	g.add_theme_constant_override("h_separation", 4)
@@ -709,7 +721,8 @@ func _refresh_pieces() -> void:
 	var dirs := ["right", "down", "left", "up"]
 	_pieces_note.text = ("Click a piece to add it at the green arrow." if has_end
 		else "No open track end: pick a piece, then click the map to put it down.") \
-		+ "  Clicking the map places the picked piece there, facing %s (R turns)." % dirs[ed.section_heading]
+		+ "  Or click the map to place it anywhere; the arrow on the preview shows which way it runs."
+	_facing.text = "Facing %s" % dirs[ed.section_heading]
 	_pieces_note.add_theme_color_override("font_color", Color("#2E8B62") if has_end else Palette.CORAL)
 	for id: String in _piece_buttons:
 		(_piece_buttons[id] as Button).set_pressed_no_signal(ed.tool == "sections" and ed.section_id == id)

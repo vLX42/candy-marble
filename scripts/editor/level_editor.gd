@@ -21,7 +21,7 @@ static var session_view := {}
 
 ## [id, label, group, hint]
 const TOOLS := [
-	["sections", "Sections", "Build", "Ready-made track pieces, in the Pieces tab on the right. Clicking one adds it at the green arrow. Clicking the map puts the picked piece there instead; R turns it."],
+	["sections", "Sections", "Build", "Ready-made track pieces, in the Pieces tab on the right. Clicking one adds it at the green arrow. Clicking the map puts the picked piece there instead; R, Shift+R or right click turns it first."],
 	["road", "Road", "Build", "Drag to draw a lane with rails. It keeps the height where you start, opens walls and ramps up or down to meet other ground."],
 	["select", "Select", "Build", "Click a thing to tweak it, drag to move it. Shift snaps to half tiles."],
 	["route", "Path", "Build", "Rival and camera path. Click to add points, right click removes the last."],
@@ -833,6 +833,10 @@ func _remove_extras_at(t: Vector2i) -> void:
 
 ## Removes whatever is under the cursor (right click).
 func remove_at(tile: Vector2i, f: Vector2) -> void:
+	# With the Sections tool a right click turns the piece instead.
+	if tool == "sections":
+		turn_section(1)
+		return
 	if tool == "route":
 		if not lv.route.is_empty():
 			push_undo()
@@ -934,11 +938,16 @@ func _drag_selection(tile: Vector2i, f: Vector2, shift: bool) -> void:
 		mark_edited()
 
 
+## Turns the piece that a click would place: +1 clockwise, -1 back.
+func turn_section(dir: int) -> void:
+	section_heading = posmod(section_heading + dir, 4)
+	_update_hover()
+	ui.on_tool_changed()
+
+
 func rotate_selection(step: float = 90.0) -> void:
 	if tool == "sections":
-		section_heading = (section_heading + 1) % 4
-		_update_hover()
-		ui.on_tool_changed()
+		turn_section(1 if step > 0.0 else -1)
 		return
 	var e := selected_extra()
 	if not e.is_empty():
@@ -1592,6 +1601,8 @@ func _line_material(col: Color, on_top: bool = false) -> StandardMaterial3D:
 	m.albedo_color = col
 	m.no_depth_test = on_top
 	m.render_priority = 5 if on_top else 0
+	# Overlays are flat shapes seen from above; never cull their back faces.
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
 	return m
 
 
@@ -1919,11 +1930,11 @@ func _draw_ghost() -> void:
 		if v[0] == ".":
 			continue
 		var y: float = (int(v[0]) if v[0].is_valid_int() else res.end[3] if not res.end.is_empty() else tier) * built.step + 0.1
-		var col := Color(Palette.MINT, 0.55)
+		var col := Color("#6FDDB0", 0.72)
 		if not res.ok:
-			col = Color(Palette.RASPBERRY, 0.5)
+			col = Color(Palette.RASPBERRY, 0.65)
 		elif is_ground(c.x, c.y):
-			col = Color(Palette.CORAL, 0.5)
+			col = Color(Palette.CORAL, 0.65)
 		if v[1] in ["S", "G"]:
 			col = Color(Palette.LEMON, 0.8)
 		var x0 := c.x * TILE + 0.06
@@ -1933,6 +1944,20 @@ func _draw_ghost() -> void:
 		for p in [Vector3(x0, y, z0), Vector3(x1, y, z0), Vector3(x1, y, z1), Vector3(x0, y, z0), Vector3(x1, y, z1), Vector3(x0, y, z1)]:
 			im.surface_set_color(col)
 			im.surface_add_vertex(p)
+	# Arrow along the lane: the way the marble will roll through the piece.
+	var c0 := TrackPieces.world(_section_origin(_hover, section_heading), section_heading, 0.0, 2.5)
+	var y0 := _section_tier(_hover) * built.step + 0.25
+	var base := Vector3((c0.x + 0.5) * TILE, y0, (c0.y + 0.5) * TILE)
+	var fv: Vector2i = TrackPieces.F[section_heading]
+	var lv2: Vector2i = TrackPieces.L[section_heading]
+	var fwd := Vector3(fv.x, 0, fv.y)
+	var side := Vector3(lv2.x, 0, lv2.y)
+	var arrow_col := Color("#1E8F5E")
+	for p in [base + side * 0.5, base + fwd * 3.0 + side * 0.5, base + fwd * 3.0 - side * 0.5,
+			base + side * 0.5, base + fwd * 3.0 - side * 0.5, base - side * 0.5,
+			base + fwd * 2.4 + side * 1.6, base + fwd * 4.6, base + fwd * 2.4 - side * 1.6]:
+		im.surface_set_color(arrow_col)
+		im.surface_add_vertex(p)
 	im.surface_end()
 	_ghost_mesh.mesh = im
 	_ghost_mesh.visible = true
@@ -2147,6 +2172,8 @@ func _on_key(key: InputEventKey) -> void:
 			test_play()
 	elif k == KEY_TAB:
 		toggle_view()
+	elif k == KEY_R and tool == "sections":
+		turn_section(-1 if key.shift_pressed else 1)
 	elif k == KEY_R:
 		rotate_selection(45.0 if key.shift_pressed else 90.0)
 	elif k == KEY_DELETE or k == KEY_BACKSPACE:

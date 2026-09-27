@@ -84,6 +84,19 @@ func _build_track() -> void:
 		if x.type == "enemy":
 			e += 1
 	_check("monster sections bring their monsters", e == 2, "%d sweepers" % e)
+	# Turning a piece before placing it: buttons, R / Shift+R and right click.
+	ed.set_tool("sections")
+	ed.section_heading = 0
+	ed.turn_section(1)
+	var after_right: int = ed.section_heading
+	ed.turn_section(-1)
+	ed.turn_section(-1)
+	var after_left: int = ed.section_heading
+	var extras_before: int = ed.lv.extras.size()
+	ed.remove_at(Vector2i(3, 3), Vector2(3.5, 3.5))
+	_check("pieces turn right, left and on right click (without deleting anything)",
+		after_right == 1 and after_left == 3 and ed.section_heading == 0 and ed.lv.extras.size() == extras_before,
+		"%d %d %d" % [after_right, after_left, ed.section_heading])
 	# A piece placed with a click, facing down.
 	ed.section_id = "straight"
 	ed.section_heading = 1
