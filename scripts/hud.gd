@@ -165,7 +165,10 @@ func show_results(r: Dictionary) -> void:
 	_res_title.text = "[center]%s[/center]" % CandyText.rainbow(r.get("title", ""))
 	_res_time.text = "%.2f s" % r.time if r.has("time") else ""
 	_res_time.visible = r.has("time")
+	# Take old chips out right away (queue_free alone leaves them in the list
+	# until the end of the frame, and the stamp animation below would grab them).
 	for c in _res_chips.get_children():
+		_res_chips.remove_child(c)
 		c.queue_free()
 	var medal: String = r.get("medal", "")
 	if medal != "":
@@ -179,6 +182,7 @@ func show_results(r: Dictionary) -> void:
 	_res_info.visible = _res_info.text != ""
 
 	for c in _res_board.get_children():
+		_res_board.remove_child(c)
 		c.queue_free()
 	var times: Array = r.get("board", [])
 	_res_board_box.visible = not times.is_empty()
@@ -225,9 +229,12 @@ func show_results(r: Dictionary) -> void:
 	for k in chips.size():
 		var c: Control = chips[k]
 		c.modulate.a = 0.0
-		var st := create_tween()
+		# Owned by the chip: if the chip goes away, so does its animation.
+		var st := c.create_tween()
 		st.tween_interval(0.65 + 0.22 * k)
 		st.tween_callback(func() -> void:
+			if not is_instance_valid(c):
+				return
 			c.pivot_offset = c.size * 0.5
 			c.scale = Vector2(1.8, 1.8)
 			c.modulate.a = 1.0

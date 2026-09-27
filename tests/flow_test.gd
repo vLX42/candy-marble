@@ -103,6 +103,13 @@ func _process(delta: float) -> bool:
 				_check("test play starts on the picked tile", Vector2i(int(p.x / 2.0), int(p.z / 2.0)) == Vector2i(8, 2), str(p))
 				mg.set("test_mode", false)
 				mg.set("test_start", Vector2i(-1, -1))
+				# Two results cards in a row (finishing level 1, then level 2): only
+				# the new chips may be left to animate.
+				var r := {title = "In the hole!", time = 10.0, medal = "GOLD", badge = "NEW BEST!", info = ""}
+				main.hud.show_results(r)
+				main.hud.show_results(r)
+				_check("second results card only holds its own chips", main.hud._res_chips.get_child_count() == 2,
+					"%d chips" % main.hud._res_chips.get_child_count())
 				print("\n".join(results))
 				print("FLOW TEST ", "FAILED" if failed else "PASSED")
 				quit(1 if failed else 0)
