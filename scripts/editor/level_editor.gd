@@ -140,6 +140,10 @@ var _drag_undo := false
 ## rebuilds the pieces it touches.
 const CHUNK := 12
 var _terrain_root: Node3D
+## Scenery lives outside `world` and is only rebuilt when the map size changes,
+## so it doesn't jump around on every edit.
+var _backdrop: Node3D
+var _backdrop_key := ""
 var _ents: Node3D
 var _chunks := {}
 var _dirty_tiles := {}
@@ -1086,15 +1090,29 @@ func _rebuild() -> void:
 	for kj in ceili(float(rows()) / CHUNK):
 		for ki in ceili(float(cols()) / CHUNK):
 			_build_chunk(Vector2i(ki, kj))
-	if show_scenery:
-		var backdrop := Backdrop.new()
-		backdrop.setup(built, hash(built.title))
-		world.add_child(backdrop)
+	_update_backdrop()
 	_ents = null
 	_rebuild_entities()
 	_draw_grid()
 	_draw_marks()
 	_update_hover()
+
+
+func _update_backdrop() -> void:
+	var key := "%s:%d:%dx%d" % [quest.id, li, cols(), rows()] if show_scenery else ""
+	if key == _backdrop_key:
+		return
+	_backdrop_key = key
+	if _backdrop:
+		remove_child(_backdrop)
+		_backdrop.queue_free()
+		_backdrop = null
+	if show_scenery:
+		var b := Backdrop.new()
+		b.setup(built, hash(quest.id) + li)
+		_backdrop = b
+		add_child(b)
+		b.process_mode = Node.PROCESS_MODE_INHERIT if animate else Node.PROCESS_MODE_DISABLED
 
 
 func _full_rebuild() -> void:
@@ -1137,6 +1155,8 @@ func _rebuild_entities() -> void:
 
 func set_animate(on: bool) -> void:
 	animate = on
+	if _backdrop:
+		_backdrop.process_mode = Node.PROCESS_MODE_INHERIT if animate else Node.PROCESS_MODE_DISABLED
 	_full_rebuild()
 
 

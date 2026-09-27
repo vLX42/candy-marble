@@ -30,7 +30,12 @@ func setup(level_data: LevelBase, seed_value: int) -> void:
 func _ready() -> void:
 	_bounds = Rect2(0, 0, level.cols * LevelBase.TILE, level.rows * LevelBase.TILE).grow(24.0)
 	var spots := _free_spots(11.0)
-	spots.shuffle()
+	# Seeded shuffle, so the same level always gets the same scenery.
+	for i in range(spots.size() - 1, 0, -1):
+		var j := _rng.randi_range(0, i)
+		var tmp := spots[i]
+		spots[i] = spots[j]
+		spots[j] = tmp
 	var k := 0
 	for p in spots:
 		var roll := _rng.randf()
