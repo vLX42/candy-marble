@@ -383,7 +383,7 @@ static func _rot(c: String, table: Dictionary, times: int) -> String:
 
 ## Places `piece` with its entry at `origin` facing heading `h` at `tier`.
 ## Returns {ok, why, cells: {Vector2i: [h, o]}, extras, route, end: [x, z, h, tier]}.
-static func stamp(piece: Dictionary, origin: Vector2i, h: int, tier: int) -> Dictionary:
+static func stamp(piece: Dictionary, origin: Vector2i, h: int, tier: int, step: float = LevelBase.TIER) -> Dictionary:
 	var out := {ok = true, why = "", cells = {}, extras = [], route = [], end = []}
 	var w: int = piece.w
 	for z in 6:
@@ -423,7 +423,7 @@ static func stamp(piece: Dictionary, origin: Vector2i, h: int, tier: int) -> Dic
 			var v: Vector2 = Vector2(F[h]) * tv[0] + Vector2(L[h]) * tv[1]
 			d.travel = [v.x * 2.0, 0.0, v.y * 2.0]
 		if d.has("rise"):
-			d.height = (tier - piece.entry + d.get("base", piece.entry)) * LevelBase.TIER + d.rise
+			d.height = (tier - piece.entry + d.get("base", piece.entry)) * step + d.rise
 			d.erase("rise")
 			d.erase("base")
 		out.extras.append(d)

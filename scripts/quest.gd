@@ -174,21 +174,23 @@ static func install_file(file_path: String) -> Quest:
 
 
 ## Sample quests shipped with the game, installed once (deleting them sticks).
-const SAMPLES := ["res://quests/sweet_starter.json"]
+const SAMPLES := ["res://quests/sweet_starter.json", "res://quests/marble_madness.json"]
 
 
+## Installs each shipped sample once (a deleted sample stays deleted).
 static func install_samples() -> void:
-	var marker := DIR + "/.samples_1"
-	if FileAccess.file_exists(marker):
-		return
+	DirAccess.make_dir_recursive_absolute(DIR)
 	for p: String in SAMPLES:
+		var marker := "%s/.sample_%s" % [DIR, p.get_file().get_basename()]
+		# Older builds marked only the first sample.
+		if FileAccess.file_exists(marker) or (p.ends_with("sweet_starter.json") and FileAccess.file_exists(DIR + "/.samples_1")):
+			continue
 		var q := load_file(p)
 		if q:
 			install(q)
-	DirAccess.make_dir_recursive_absolute(DIR)
-	var f := FileAccess.open(marker, FileAccess.WRITE)
-	if f:
-		f.store_string("1")
+		var f := FileAccess.open(marker, FileAccess.WRITE)
+		if f:
+			f.store_string("1")
 
 
 static func folder() -> String:

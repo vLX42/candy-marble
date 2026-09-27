@@ -15,7 +15,7 @@ const MAX_SIZE := 160
 const MAX_EXTRAS := 400
 const MAX_ROUTE := 400
 const HEIGHT_CHARS := ".0123456789ewsn"
-const OBJECT_CHARS := ".SGBHWT><v^xXzZ-|CKltbg%hr$@#"
+const OBJECT_CHARS := ".SGBHWT><v^xXzZ-|CKltbg%hr$@#AM"
 
 ## Extras and their tweakable numbers: {param: [default, min, max, label]}.
 ## "travel" (Vector3) and "target_tile" (Vector2) are handled on their own.
@@ -69,7 +69,7 @@ static func blank(level_title: String = "New level") -> Dictionary:
 		title = level_title, description = "", par = 30.0, race = false,
 		heights = h, objects = o, extras = [], route = [],
 		theme = THEMES["Candy"].duplicate(true),
-		monster_speed = 1.0, monster_tint = "", rival_speed = 1.0, rival_tint = "",
+		monster_speed = 1.0, monster_tint = "", rival_speed = 1.0, rival_tint = "", break_drop = 0, step = TIER,
 	}
 
 
@@ -93,6 +93,8 @@ static func from_dict(d: Dictionary) -> CustomLevel:
 	l.monster_tint = _color_or_none(s.monster_tint)
 	l.rival_speed = s.rival_speed
 	l.rival_tint = _color_or_none(s.rival_tint)
+	l.break_drop = s.break_drop
+	l.step = s.step
 	var ex: Array[Dictionary] = []
 	for e: Dictionary in s.extras:
 		ex.append(decode_extra(e))
@@ -137,6 +139,8 @@ static func sanitize(d: Variant) -> Dictionary:
 	out.race = src.get("race") is bool and src.race
 	out.monster_speed = clampf(_num(src.get("monster_speed"), 1.0), 0.25, 3.0)
 	out.rival_speed = clampf(_num(src.get("rival_speed"), 1.0), 0.5, 1.6)
+	out.break_drop = clampi(int(_num(src.get("break_drop"), 0)), 0, 18)
+	out.step = snappedf(clampf(_num(src.get("step"), TIER), 0.25, 1.5), 0.05)
 	out.monster_tint = _color_text(src.get("monster_tint"), "")
 	out.rival_tint = _color_text(src.get("rival_tint"), "")
 	var theme: Dictionary = src.get("theme") if src.get("theme") is Dictionary else {}
@@ -354,6 +358,10 @@ static func _can_step(l: LevelBase, a: Vector2i, b: Vector2i) -> bool:
 	var cb := l.tile_center(b.x, b.y)
 	var ha := l.surface(a.x, a.y, ca.x, ca.y)
 	var hb := l.surface(b.x, b.y, cb.x, cb.y)
+	if l.obj_char(b.x, b.y) == "A":
+		return false
+	if l.break_drop > 0 and ha - hb > l.break_drop * l.step + 0.3:
+		return false
 	if l.is_ramp(a.x, a.y) or l.is_ramp(b.x, b.y):
 		return hb - ha < 1.2
 	return hb - ha < 0.3

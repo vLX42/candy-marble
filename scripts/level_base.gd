@@ -22,7 +22,8 @@ extends RefCounted
 ##   K checkpoint gate spanning z (for travel along x)
 ##   l lollipop   t candy tree   b gummy bear
 ##   g gumdrop  % golden cupcake  h heart candy  r wrapped candy  $ gem candy (floating decor)
-##   @ rollover star  # drop target
+##   @ rollover star  # drop target   A sour goo pool (pops the marble)
+##   M humps: big smooth humps across a run of M tiles (Marble Madness bridges)
 ## extras: loop, cannon {target_tile}, slingshot, hoop {height}, spinner, redirect
 
 const TILE := 2.0
@@ -32,6 +33,7 @@ const HOLE_RADIUS := 0.85
 const TRENCH_DEPTH := 0.8
 const SWEEPER_SPEED := 2.8
 const SWEEPER_FAST := 4.5
+const HUMP_HEIGHT := 0.9
 
 var title := ""
 var time_limit := 60.0  ## par time in seconds (medals: gold <= par, silver <= 1.3x, bronze <= 1.7x)
@@ -57,6 +59,10 @@ var monster_tint := Color(0, 0, 0, 0)
 ## Race levels: rival cruise speed multiplier and colour.
 var rival_speed := 1.0
 var rival_tint := Color(0, 0, 0, 0)
+## Marble breaks on drops of more than this many steps (0 = never).
+var break_drop := 0
+## Height of one step (tier) in world units. Taller steps = taller cliffs.
+var step := TIER
 
 # Filled by build().
 var cols := 0
@@ -67,6 +73,7 @@ var entities: Array[Dictionary] = []
 var _trenches: Array = []        # [Vector2 a, Vector2 b] world
 var _hills: Array[Vector4] = []  # x, z, height, radius
 var _waves := {}                 # Vector2i tile -> true
+var _humps := {}                 # Vector2i tile -> [axis (0 = x), start, end (world), humps]
 
 
 func build() -> void:
@@ -78,6 +85,7 @@ func build() -> void:
 		var line := objects[j]
 		for i in line.length():
 			_parse_object(line[i], i, j)
+	_build_humps()
 	for e in extras:
 		var d := e.duplicate()
 		d.pos = tile_center_f(e.tile)
@@ -161,7 +169,7 @@ func height(x: float, z: float) -> float:
 
 func _flat(i: int, j: int) -> float:
 	var t := tier_of(i, j)
-	return t * TIER if t >= 0 else NAN
+	return t * step if t >= 0 else NAN
 
 
 func _base(i: int, j: int, x: float, z: float) -> float:
@@ -209,6 +217,8 @@ func feature(x: float, z: float) -> float:
 		h += hill.z * exp(-(dx * dx + dz * dz) / (2.0 * hill.w * hill.w))
 	if not _waves.is_empty():
 		h += _wave(x, z)
+	if not _humps.is_empty():
+		h += _hump(x, z)
 	if goal != Vector2.INF:
 		var dg := p.distance_to(goal)
 		if dg < 2.8:
@@ -238,6 +248,49 @@ func _wave(x: float, z: float) -> float:
 		if not w_here:
 			mask = 0.0
 	return 0.32 * mask * sin((x - z) * 1.25) * cos((x + z) * 0.55)
+
+
+## Each run of M tiles gets whole humps along its longer direction, flat at
+## both ends so it joins the ground around it.
+func _build_humps() -> void:
+	_humps.clear()
+	for j in objects.size():
+		for i in objects[j].length():
+			if objects[j][i] != "M":
+				continue
+			var run := [_m_run(i, j, Vector2i(1, 0)), _m_run(i, j, Vector2i(0, 1))]
+			var axis := 0 if run[0].y - run[0].x >= run[1].y - run[1].x else 1
+			var a0: float = run[axis].x * TILE
+			var a1: float = (run[axis].y + 1) * TILE
+			_humps[Vector2i(i, j)] = [axis, a0, a1, maxi(1, roundi((a1 - a0) / (2.0 * TILE)))]
+
+
+## First and last tile index of the M run through (i, j) along d.
+func _m_run(i: int, j: int, d: Vector2i) -> Vector2i:
+	var a := Vector2i(i, j)
+	while obj_char(a.x - d.x, a.y - d.y) == "M":
+		a -= d
+	var b := Vector2i(i, j)
+	while obj_char(b.x + d.x, b.y + d.y) == "M":
+		b += d
+	return Vector2i(a.x, b.x) if d.x == 1 else Vector2i(a.y, b.y)
+
+
+func _hump(x: float, z: float) -> float:
+	var t := tile_at(x, z)
+	var hp: Array = _humps.get(t, [])
+	if hp.is_empty():
+		# Shared tile edges: take the hump tile on the other side.
+		for n in [tile_at(x - 0.001, z), tile_at(x, z - 0.001)]:
+			if _humps.has(n):
+				hp = _humps[n]
+				break
+		if hp.is_empty():
+			return 0.0
+	var c := x if hp[0] == 0 else z
+	var u := clampf((c - hp[1]) / (hp[2] - hp[1]), 0.0, 1.0)
+	var s := sin(PI * hp[3] * u)
+	return HUMP_HEIGHT * s * s
 
 
 func in_hole(x: float, z: float) -> bool:
@@ -292,6 +345,8 @@ func _parse_object(c: String, i: int, j: int) -> void:
 			_add_checkpoint(c == "C", i, j)
 		"@":
 			entities.append({type = "pinball", pos = p, kind = "rollover"})
+		"A":
+			entities.append({type = "goo", pos = p})
 		"#":
 			entities.append({type = "pinball", pos = p, kind = "target"})
 		"l", "t", "b", "g", "%", "h", "r", "$":

@@ -11,6 +11,9 @@ signal respawned
 @export var max_speed := 8.0
 @export_range(0.0, 1.0) var air_control := 0.3
 @export var fall_limit := -10.0
+## Marble Madness rule: landing after a fall taller than this breaks the
+## marble (world units, 0 = never). Set per level by main.
+@export var break_drop := 0.0
 @export var radius := 0.5
 ## Model in models/ to show (the rival uses "rival").
 @export var model_name := "ball"
@@ -29,6 +32,8 @@ var _trail: CPUParticles3D
 var _glow: OmniLight3D
 ## True while flying from a cannon: no air damping so the arc lands on target.
 var _flying := false
+## Highest point since the marble last touched something (for break_drop).
+var _air_top := -INF
 
 
 func _ready() -> void:
@@ -73,6 +78,7 @@ func _physics_process(_delta: float) -> void:
 		die()
 		return
 
+	_check_landing()
 	if _flying and input_lock <= 0.0 and get_contact_count() > 0:
 		_flying = false
 		linear_damp_mode = RigidBody3D.DAMP_MODE_COMBINE
@@ -152,6 +158,22 @@ func _screen_to_world(input: Vector2) -> Vector3:
 	var right := Vector3(cam_basis.x.x, 0.0, cam_basis.x.z).normalized()
 	var back := Vector3(cam_basis.z.x, 0.0, cam_basis.z.z).normalized()
 	return (right * input.x + back * input.y).limit_length(1.0)
+
+
+func _check_landing() -> void:
+	# Launches (cannons, catapults, loops) never count as falls.
+	if break_drop <= 0.0 or _flying or input_lock > 0.0:
+		_air_top = -INF
+		return
+	if get_contact_count() == 0:
+		_air_top = maxf(_air_top, global_position.y)
+		return
+	if _air_top > -INF and _air_top - global_position.y > break_drop:
+		_air_top = -INF
+		get_tree().call_group("game", "cheer", "SPLAT!", global_position + Vector3.UP * 1.2)
+		die()
+		return
+	_air_top = -INF
 
 
 func is_grounded() -> bool:
@@ -262,4 +284,5 @@ func die() -> void:
 	freeze = false
 	visible = true
 	alive = true
+	_air_top = -INF
 	respawned.emit()

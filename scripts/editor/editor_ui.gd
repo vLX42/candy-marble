@@ -603,7 +603,7 @@ func on_tool_changed() -> void:
 				b.add_theme_stylebox_override(st, sb)
 			g.add_child(b)
 		_options.add_child(_label("Each step is half a marble high. A tile next to a higher one is a wall.", true))
-	if t in ["paint", "raise", "lower", "ramp", "erase", "waves", "hill", "trench", "clear"]:
+	if t in ["paint", "raise", "lower", "ramp", "erase", "waves", "hill", "trench", "goo", "humps", "clear"]:
 		_options.add_child(CandyTheme.caption("Brush  ([ and ])"))
 		var row := HBoxContainer.new()
 		_options.add_child(row)
@@ -822,6 +822,8 @@ func _inspector_char(ch: String) -> void:
 		"B": "Bounces the marble away and fills the Sugar Rush meter.",
 		"W": "Wobbly ripples. Neighbouring wave tiles blend together.",
 		"H": "A round bump.", "T": "A dip. Neighbouring trench tiles join into a channel.",
+		"A": "Sour goo. Rolling in pops the marble.",
+		"M": "Big humps. A strip of hump tiles makes whole humps along its long side.",
 	}
 	if BOOSTER_TEXT.has(ch):
 		_inspector.add_child(_label("Speed pad pushing %s." % BOOSTER_TEXT[ch], true))
@@ -866,6 +868,12 @@ func refresh_level() -> void:
 		par.value = ed.estimate_par(), "Guess from the length of the path"))
 	_level_box.add_child(_label("Gold medal at par, silver at 1.3x, bronze at 1.7x.", true))
 
+	_slider(_level_box, "Step height", 0.25, 1.5, 0.05, lv.get("step", 0.5), func(v: float) -> void:
+		ed.set_level_value("step", v), "%.2f")
+	_level_box.add_child(_label("How tall one height step is. Taller steps make taller cliffs and steeper ramps.", true))
+	_slider(_level_box, "Hard landings", 0, 12, 1, lv.get("break_drop", 0), func(v: float) -> void:
+		ed.set_level_value("break_drop", int(v)), "%d")
+	_level_box.add_child(_label("Marble Madness rule: the marble breaks on drops higher than this many steps. 0 = never.", true))
 	_level_box.add_child(HSeparator.new())
 	_level_box.add_child(CandyTheme.caption("RACE"))
 	var race := CheckBox.new()

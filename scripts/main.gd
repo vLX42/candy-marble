@@ -30,6 +30,7 @@ const SCENES := {
 	"ghost": preload("res://scenes/ghost.tscn"),
 	"windmill": preload("res://scenes/windmill.tscn"),
 	"catapult": preload("res://scenes/catapult.tscn"),
+	"goo": preload("res://scenes/goo.tscn"),
 }
 ## Sugar Rush: pinball hits fill the meter; full = a few seconds of rush.
 const RUSH_HITS := 6.0
@@ -183,6 +184,7 @@ func load_level(data: LevelBase) -> void:
 	ball.position = ground(level.spawn) + Vector3.UP * 0.6
 	world.add_child(ball)
 	ball.died.connect(_on_ball_died)
+	ball.break_drop = level.break_drop * level.step + 0.3 if level.break_drop > 0 else 0.0
 	rival = null
 	race_lost = false
 	rival_time = -1.0

@@ -36,6 +36,8 @@ const TOOLS := [
 	["waves", "Waves", "Surface", "Wobbly Marble Madness ripples."],
 	["hill", "Hill", "Surface", "A round bump."],
 	["trench", "Trench", "Surface", "A channel. Neighbouring trench tiles join up."],
+	["humps", "Humps", "Surface", "Big smooth humps across a lane. Paint a strip; the humps run along its long side."],
+	["goo", "Goo", "Surface", "Sour goo pool, Marble Madness's acid. Rolling in pops the marble."],
 	["clear", "Clear", "Surface", "Remove surface bumps and objects from tiles (keeps the ground)."],
 	["spawn", "Start", "Objects", "Where the marble starts. Only one."],
 	["goal", "Hole", "Objects", "The golf hole. Only one."],
@@ -60,11 +62,11 @@ const TOOLS := [
 	["redirect", "Turner", "Toys", "Catches the marble and launches it the way it points."],
 ]
 const OBJ_CHAR := {spawn = "S", goal = "G", bumper = "B", star = "@", target = "#",
-	waves = "W", hill = "H", trench = "T"}
+	waves = "W", hill = "H", trench = "T", goo = "A", humps = "M"}
 const OBJ_NAMES := {
 	"S": "Start", "G": "Golf hole", "B": "Bumper", ">": "Booster", "<": "Booster", "v": "Booster",
 	"^": "Booster", "C": "Checkpoint", "K": "Checkpoint", "W": "Waves", "H": "Hill", "T": "Trench",
-	"@": "Rollover star", "#": "Drop target", "l": "Lollipop", "t": "Candy tree", "b": "Gummy bear",
+	"@": "Rollover star", "A": "Sour goo", "M": "Humps", "#": "Drop target", "l": "Lollipop", "t": "Candy tree", "b": "Gummy bear",
 	"g": "Gumdrop", "%": "Golden cupcake", "h": "Heart candy", "r": "Wrapped candy", "$": "Gem candy",
 }
 const DECOR := [["l", "Lollipop"], ["t", "Candy tree"], ["b", "Gummy bear"], ["g", "Gumdrop"],
@@ -75,7 +77,7 @@ const EXTRA_NAMES := {
 	"slingshot": "Slingshot", "cannon": "Cannon", "catapult": "Catapult", "loop": "Loop", "chute": "Chute",
 	"hoop": "Hoop", "spinner": "Spinner", "redirect": "Turner",
 }
-const PAINT_TOOLS := ["road", "paint", "raise", "lower", "ramp", "erase", "waves", "hill", "trench", "clear", "decor",
+const PAINT_TOOLS := ["road", "paint", "raise", "lower", "ramp", "erase", "waves", "hill", "trench", "goo", "humps", "clear", "decor",
 	"bumper", "star", "target", "booster"]
 const MAX_UNDO := 120
 
@@ -652,7 +654,7 @@ func _apply(tile: Vector2i, f: Vector2, shift: bool) -> void:
 				set_tool("paint")
 				ui.toast("Height %d" % tier)
 			return
-		"waves", "hill", "trench":
+		"waves", "hill", "trench", "goo", "humps":
 			for t in _brush_tiles(tile):
 				if is_ground(t.x, t.y):
 					set_o(t.x, t.y, OBJ_CHAR[tool])
@@ -1123,7 +1125,7 @@ func _place_section_at(tile: Vector2i) -> void:
 
 func _put_section(id: String, origin: Vector2i, h: int, t: int, at_end: bool) -> bool:
 	var piece := TrackPieces.get_piece(id)
-	var res := TrackPieces.stamp(piece, origin, h, t)
+	var res := TrackPieces.stamp(piece, origin, h, t, built.step)
 	if not res.ok:
 		ui.toast(res.why)
 		return false
@@ -1596,7 +1598,7 @@ func _draw_grid() -> void:
 			if c == ".":
 				tops[j * w + i] = NAN
 			elif c.is_valid_int():
-				tops[j * w + i] = int(c) * LevelBase.TIER
+				tops[j * w + i] = int(c) * built.step
 			else:
 				var ctr := built.tile_center(i, j)
 				tops[j * w + i] = built.surface(i, j, ctr.x, ctr.y)
@@ -1719,7 +1721,7 @@ func _draw_track_end() -> void:
 	if te.is_empty():
 		return
 	var c := TrackPieces.end_center(te)
-	var base := Vector3((c.x + 0.5) * TILE, te[3] * LevelBase.TIER + 0.35, (c.y + 0.5) * TILE)
+	var base := Vector3((c.x + 0.5) * TILE, te[3] * built.step + 0.35, (c.y + 0.5) * TILE)
 	var f: Vector2i = TrackPieces.F[te[2]]
 	var l: Vector2i = TrackPieces.L[te[2]]
 	var fwd := Vector3(f.x, 0, f.y)
@@ -1858,7 +1860,7 @@ func _update_hover() -> void:
 		for j in range(lo.y, hi.y + 1):
 			for i in range(lo.x, hi.x + 1):
 				tiles.append(Vector2i(i, j))
-	elif tool in ["paint", "raise", "lower", "ramp", "erase", "waves", "hill", "trench", "clear"]:
+	elif tool in ["paint", "raise", "lower", "ramp", "erase", "waves", "hill", "trench", "goo", "humps", "clear"]:
 		tiles = _brush_tiles(_hover)
 	else:
 		tiles = [_hover]
@@ -1877,7 +1879,7 @@ func _update_hover() -> void:
 			var c := built.tile_center(t.x, t.y)
 			y = built.surface(t.x, t.y, c.x, c.y)
 		if tool in ["paint", "box"]:
-			y = maxf(y, tier * LevelBase.TIER)
+			y = maxf(y, tier * built.step)
 		y += 0.06
 		var x0 := t.x * TILE + 0.08
 		var z0 := t.y * TILE + 0.08
@@ -1903,7 +1905,7 @@ func _draw_ghost() -> void:
 		var v: Array = res.cells[c]
 		if v[0] == ".":
 			continue
-		var y: float = (int(v[0]) if v[0].is_valid_int() else res.end[3] if not res.end.is_empty() else tier) * LevelBase.TIER + 0.1
+		var y: float = (int(v[0]) if v[0].is_valid_int() else res.end[3] if not res.end.is_empty() else tier) * built.step + 0.1
 		var col := Color(Palette.MINT, 0.55)
 		if not res.ok:
 			col = Color(Palette.RASPBERRY, 0.5)

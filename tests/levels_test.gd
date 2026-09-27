@@ -216,6 +216,8 @@ func _report(ok: bool) -> void:
 		line += "  | rival %s" % ("%.1f s" % main.rival_time if main.rival_time > 0 else "beaten, was at waypoint %d/%d" % [main.rival._wp, main.rival._route.size()])
 	if ok and level_t > lvl.time_limit:
 		line += "  WARN: bot slower than par"
+	if not ok:
+		line += "  | stuck at tile %s, waypoint %d/%d" % [(Vector2(main.ball.global_position.x, main.ball.global_position.z) / LevelBase.TILE).snapped(Vector2.ONE * 0.1), wp, _route().size()]
 	results.append(line)
 	print(line)
 	if not ok:

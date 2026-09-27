@@ -107,6 +107,16 @@ Sharing and installing:
 - **Save as file:** a `.candyquest` file. Your friend drops it on the game
   window, picks it with Quests > Open file, or copies it into the quest folder.
 
+Marble Madness touches in the Level tab: **Step height** (taller cliffs) and
+**Hard landings** (the marble breaks on drops over N steps). Surface tools
+include **Goo** (sour pools that pop the marble) and **Humps** (big smooth humps
+across a lane).
+
+The shipped **Marble Madness** quest (`quests/marble_madness.json`, built by
+`tools/make_madness_quest.py`) has five multi-level courses: Spiral Summit,
+Terrace Falls, Goo Gorge, Sky Catwalks and Ultimate Madness (a race).
+`tools/preview_quest.gd` renders a 3D overview of every level in a quest.
+
 Shared files are data only: every field is checked and clamped
 (`CustomLevel.sanitize`) and no code is ever loaded. The sample quest
 `quests/sweet_starter.json` (built by `tools/make_sample_quest.py`) is installed
@@ -146,6 +156,8 @@ godot --headless --fixed-fps 120 -s tests/race_test.gd     # race win / 2nd plac
 godot --headless --fixed-fps 120 -s tests/hazards_test.gd  # stomper, hopper, ghost, windmill, catapult
 godot --headless --fixed-fps 120 -s tests/editor_test.gd   # editor tools, undo, quests, share codes, sanitising
 godot --headless --fixed-fps 120 -s tests/sections_test.gd # sections, Road join-ups, guide steps
+godot --headless --fixed-fps 120 -s tests/madness_test.gd  # hard landings, goo, humps, tall steps
+godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/marble_madness.json
 godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --remix   # built-in levels after a trip through the quest format
 godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/sweet_starter.json
 godot --always-on-top -s tests/shots.gd                   # screenshots to tests/shots/
