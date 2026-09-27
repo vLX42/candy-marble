@@ -37,13 +37,65 @@ var _res_board_box: VBoxContainer
 var _res_board_title: Label
 var _res_board: GridContainer
 var _res_hint: Label
+var _count: RichTextLabel
+var _count_tween: Tween
+var _pause: PanelContainer
+var _pause_box: VBoxContainer
+
+signal pause_action(action: String)
 
 
 func _ready() -> void:
+	# Keeps working while the game is paused (the pause card lives here).
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	_build_level_card()
 	_build_timer_card()
 	_build_toast()
 	_build_results()
+	_build_count()
+	_build_pause()
+
+
+## Big 3 / 2 / 1 / GO! in the middle of the screen.
+func show_count(text: String) -> void:
+	_count.text = "[center]%s[/center]" % CandyText.rainbow(text, text.length())
+	_count.visible = true
+	_count.pivot_offset = _count.size * 0.5
+	if _count_tween:
+		_count_tween.kill()
+	_count.scale = Vector2(1.6, 1.6)
+	_count.modulate.a = 1.0
+	_count_tween = create_tween()
+	_count_tween.tween_property(_count, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_count_tween.tween_interval(0.3 if text != "GO!" else 0.35)
+	_count_tween.tween_property(_count, "modulate:a", 0.0, 0.2)
+	_count_tween.tween_callback(func() -> void: _count.visible = false)
+
+
+func show_pause(back_label: String) -> void:
+	for c in _pause_box.get_children():
+		if c is Button:
+			_pause_box.remove_child(c)
+			c.queue_free()
+	for spec: Array in [["Resume", "resume"], ["Restart level", "restart"],
+			["Camera: %s" % ("follows the track" if Settings.camera_follow else "fixed"), "camera"],
+			["Ghost: %s" % ("on" if Settings.ghost else "off"), "ghost"], [back_label, "quit"]]:
+		var b := Button.new()
+		b.text = spec[0]
+		b.custom_minimum_size.x = 380
+		b.pressed.connect(func() -> void: pause_action.emit(spec[1]))
+		b.mouse_entered.connect(b.grab_focus)
+		_pause_box.add_child(b)
+	_pause.visible = true
+	(_pause_box.get_child(1) as Button).call_deferred("grab_focus")
+
+
+func hide_pause() -> void:
+	_pause.visible = false
+
+
+func is_paused_visible() -> bool:
+	return _pause.visible
 
 
 # --- Public -------------------------------------------------------------------
@@ -257,6 +309,41 @@ func _build_toast() -> void:
 	_toast_sub = _plain("", 24, INK)
 	_toast_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(_toast_sub)
+
+
+func _build_count() -> void:
+	var wrap := CenterContainer.new()
+	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wrap.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(wrap)
+	_count = _rich(150)
+	_count.custom_minimum_size.x = 600
+	_count.visible = false
+	wrap.add_child(_count)
+
+
+func _build_pause() -> void:
+	var dim := ColorRect.new()
+	dim.color = Color(0.35, 0.2, 0.3, 0.35)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var wrap := CenterContainer.new()
+	wrap.set_anchors_preset(Control.PRESET_FULL_RECT)
+	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pause = PanelContainer.new()
+	_pause.theme = CandyTheme.make(30)
+	_pause.visible = false
+	_pause.visibility_changed.connect(func() -> void: dim.visible = _pause.visible)
+	dim.visible = false
+	add_child(dim)
+	add_child(wrap)
+	wrap.add_child(_pause)
+	_pause_box = VBoxContainer.new()
+	_pause_box.add_theme_constant_override("separation", 10)
+	_pause.add_child(_pause_box)
+	var head := _rich(56)
+	head.text = "[center]%s[/center]" % CandyText.rainbow("Paused")
+	_pause_box.add_child(head)
 
 
 func _build_results() -> void:

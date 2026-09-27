@@ -25,8 +25,13 @@ par. Best level times and best full runs are saved locally.
 godot --path .
 ```
 
-WASD / arrows / left stick to push the ball, R to restart the level, Esc for
-the menu, F11 or Alt+Enter for fullscreen.
+WASD / arrows / left stick to push the ball, R (or pad Back) to restart the
+level, Esc / P (or pad Start) to pause, F11 or Alt+Enter for fullscreen.
+
+Each level starts with a 3-2-1-GO countdown; the clock starts on GO. Your best
+run on every level (built-in and quests) is saved as a **ghost**: a see-through
+blue marble that replays it next time. Turn it off in Settings or the pause
+menu.
 
 ## Levels
 
@@ -94,7 +99,8 @@ preview that uses the same code as the game:
 - **Level tab:** name, description, par time (with a guess button), race mode,
   rival speed and colour, colour themes, map size and crop.
 - Undo and redo, flat or 3D view, animated preview, test play with F5 (Esc
-  comes back). F1 lists every shortcut.
+  comes back), or **From here** / Shift+F5 to start the test on any tile.
+  F1 lists every shortcut.
 
 A **quest** is a pack of levels with a name, an author and a description. The
 Quest tab adds, copies, orders and deletes levels, and can remix a built-in
@@ -157,6 +163,7 @@ godot --headless --fixed-fps 120 -s tests/hazards_test.gd  # stomper, hopper, gh
 godot --headless --fixed-fps 120 -s tests/editor_test.gd   # editor tools, undo, quests, share codes, sanitising
 godot --headless --fixed-fps 120 -s tests/sections_test.gd # sections, Road join-ups, guide steps
 godot --headless --fixed-fps 120 -s tests/madness_test.gd  # hard landings, goo, humps, tall steps
+godot --headless --fixed-fps 120 -s tests/flow_test.gd     # countdown, pause, ghost replay, test from here
 godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/marble_madness.json
 godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --remix   # built-in levels after a trip through the quest format
 godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/sweet_starter.json

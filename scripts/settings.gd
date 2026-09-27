@@ -16,6 +16,8 @@ var music_volume := 0.8
 var sfx_volume := 0.9
 ## High = SSAO, glow and soft shadows. Low for weaker machines.
 var graphics_high := true
+## Show a see-through marble replaying your best run on each level.
+var ghost := true
 
 
 func _ready() -> void:
@@ -31,6 +33,7 @@ func _ready() -> void:
 		music_volume = cfg.get_value("audio", "music", music_volume)
 		sfx_volume = cfg.get_value("audio", "sfx", sfx_volume)
 		graphics_high = cfg.get_value("display", "graphics_high", graphics_high)
+		ghost = cfg.get_value("game", "ghost", ghost)
 	_apply()
 
 
@@ -57,6 +60,7 @@ func save() -> void:
 	cfg.set_value("camera", "zoom", zoom)
 	cfg.set_value("audio", "music", music_volume)
 	cfg.set_value("audio", "sfx", sfx_volume)
+	cfg.set_value("game", "ghost", ghost)
 	cfg.save(PATH)
 
 

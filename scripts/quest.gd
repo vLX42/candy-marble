@@ -183,11 +183,17 @@ static func install_samples() -> void:
 	for p: String in SAMPLES:
 		var marker := "%s/.sample_%s" % [DIR, p.get_file().get_basename()]
 		# Older builds marked only the first sample.
-		if FileAccess.file_exists(marker) or (p.ends_with("sweet_starter.json") and FileAccess.file_exists(DIR + "/.samples_1")):
-			continue
 		var q := load_file(p)
-		if q:
-			install(q)
+		if q == null:
+			continue
+		if FileAccess.file_exists(marker) or (p.ends_with("sweet_starter.json") and FileAccess.file_exists(DIR + "/.samples_1")):
+			# Newer shipped version: replace the installed copy unless the player
+			# edited it (saving stamps it with the current time).
+			var have := load_file(q.path()) if FileAccess.file_exists(q.path()) else null
+			if have and have.updated < q.updated:
+				install(q)
+			continue
+		install(q)
 		var f := FileAccess.open(marker, FileAccess.WRITE)
 		if f:
 			f.store_string("1")

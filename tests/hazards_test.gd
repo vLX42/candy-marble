@@ -53,6 +53,7 @@ var failed := false
 func _initialize() -> void:
 	main = load("res://scenes/main.tscn").instantiate()
 	main.save_scores = false
+	main.countdown = false
 	main.auto_advance = false
 	root.add_child(main)
 

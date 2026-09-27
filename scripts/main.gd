@@ -59,12 +59,25 @@ static var requested_level := -1
 static var quest: Quest = null
 ## Test play from the level editor: Esc goes back to the editor, no scores.
 static var test_mode := false
+## Test play from a picked tile instead of the start (editor "Test from here").
+static var test_start := Vector2i(-1, -1)
 
 @export var first_level := 0
 ## Off for tests: stay on the level after reaching the goal.
 @export var auto_advance := true
 ## Off for tests: don't write high scores.
 @export var save_scores := true
+## 3-2-1-GO before each level (tests turn it off).
+@export var countdown := true
+
+const COUNT_TIME := 2.4
+## Best-run ghost: position samples every GHOST_DT seconds of level time.
+const GHOST_DT := 0.05
+var _count_left := 0.0
+var _count_shown := ""
+var _ghost_rec := PackedVector3Array()
+var _ghost_play := PackedVector3Array()
+var _ghost: Node3D
 
 var level: LevelBase
 var level_index := 0
@@ -95,6 +108,8 @@ var _sun: DirectionalLight3D
 
 func _ready() -> void:
 	add_to_group("game")
+	# Keeps reading Esc while paused; the world below pauses.
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	if test_mode:
 		save_scores = false
 		auto_advance = false
@@ -174,6 +189,7 @@ func load_level(data: LevelBase) -> void:
 
 	world = Node3D.new()
 	world.name = "World"
+	world.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(world)
 	world.add_child(Terrain.new(level))
 	var backdrop := Backdrop.new()
@@ -182,6 +198,8 @@ func load_level(data: LevelBase) -> void:
 
 	ball = SCENES.ball.instantiate()
 	ball.position = ground(level.spawn) + Vector3.UP * 0.6
+	if test_mode and test_start.x >= 0 and level.is_tile_ground(test_start.x, test_start.y):
+		ball.position = ground(level.tile_center(test_start.x, test_start.y)) + Vector3.UP * 0.6
 	world.add_child(ball)
 	ball.died.connect(_on_ball_died)
 	ball.break_drop = level.break_drop * level.step + 0.3 if level.break_drop > 0 else 0.0
@@ -216,6 +234,14 @@ func load_level(data: LevelBase) -> void:
 		var d := level.description.replace("\n", " ")
 		intro = "%s\n%s" % [level.title, d if d.length() <= 90 else d.substr(0, 87) + "..."]
 	show_message(intro, 3.0)
+	_count_left = COUNT_TIME if countdown else 0.0
+	_count_shown = ""
+	if _count_left > 0.0:
+		ball.input_lock = _count_left
+		if rival:
+			rival.set("_wait", _count_left)
+	_ghost_rec = PackedVector3Array()
+	_setup_ghost()
 
 
 func _place(e: Dictionary) -> Node3D:
@@ -266,9 +292,20 @@ func _run_key() -> String:
 # --- Loop -------------------------------------------------------------------
 
 func _process(delta: float) -> void:
-	if not finished and not game_complete:
+	if _handle_pause():
+		return
+	if _count_left > 0.0:
+		_count_left -= delta
+		var n := "GO!" if _count_left <= 0.0 else str(ceili(_count_left / (COUNT_TIME / 3.0)))
+		if n != _count_shown:
+			_count_shown = n
+			hud.show_count(n)
+			sfx.play("checkpoint" if n == "GO!" else "boing", -8.0 if n == "GO!" else -14.0)
+	elif not finished and not game_complete:
 		total_time += delta
 		level_time += delta
+		_record_ghost()
+	_update_ghost()
 	var place := "1st" if race_position() == 1 else "2nd"
 	if race_lost:
 		place = "LOST"
@@ -289,25 +326,141 @@ func _process(delta: float) -> void:
 		camera.h_offset = 0.0
 		camera.v_offset = 0.0
 
-	if Input.is_action_just_pressed("ui_cancel"):
-		if test_mode:
-			test_mode = false
-			quest = null
-			get_tree().change_scene_to_file("res://scenes/editor.tscn")
-		else:
-			if quest:
-				TitleScreen.open_page = "quests"
-			quest = null
-			get_tree().change_scene_to_file("res://scenes/title.tscn")
+	if Input.is_action_just_pressed("pause") and (finished or game_complete):
+		_leave()
 		return
 	if Input.is_action_just_pressed("restart"):
-		if game_complete:
-			game_complete = false
-			falls = 0
-			total_time = 0.0
-			start_level(0)
+		_restart()
+
+
+func _restart() -> void:
+	if game_complete:
+		game_complete = false
+		falls = 0
+		total_time = 0.0
+		start_level(0)
+	else:
+		start_level(level_index)
+
+
+# --- Pause ------------------------------------------------------------------
+
+## Esc / Start pauses mid-level. Returns true while paused.
+func _handle_pause() -> bool:
+	var tree := get_tree()
+	if Input.is_action_just_pressed("pause") and not finished and not game_complete:
+		if tree.paused:
+			_resume()
 		else:
+			tree.paused = true
+			hud.show_pause("Back to the editor" if test_mode else "Quit to menu")
+			if not hud.pause_action.is_connected(_on_pause_action):
+				hud.pause_action.connect(_on_pause_action)
+		return true
+	return tree.paused
+
+
+func _resume() -> void:
+	get_tree().paused = false
+	hud.hide_pause()
+
+
+func _on_pause_action(action: String) -> void:
+	match action:
+		"resume":
+			_resume()
+		"restart":
+			_resume()
 			start_level(level_index)
+		"camera":
+			Settings.set_value("camera_follow", not Settings.camera_follow)
+			hud.show_pause("Back to the editor" if test_mode else "Quit to menu")
+		"ghost":
+			Settings.set_value("ghost", not Settings.ghost)
+			_setup_ghost()
+			hud.show_pause("Back to the editor" if test_mode else "Quit to menu")
+		"quit":
+			_resume()
+			_leave()
+
+
+func _leave() -> void:
+	if test_mode:
+		test_mode = false
+		test_start = Vector2i(-1, -1)
+		quest = null
+		get_tree().change_scene_to_file("res://scenes/editor.tscn")
+	else:
+		if quest:
+			TitleScreen.open_page = "quests"
+		quest = null
+		get_tree().change_scene_to_file("res://scenes/title.tscn")
+
+
+# --- Best-run ghost -----------------------------------------------------------
+
+func _ghost_path() -> String:
+	return "user://ghosts/%s.ghost" % _score_key().md5_text()
+
+
+func _record_ghost() -> void:
+	if ball == null:
+		return
+	while _ghost_rec.size() * GHOST_DT <= level_time:
+		_ghost_rec.append(ball.global_position)
+
+
+func _save_ghost() -> void:
+	if not save_scores or _ghost_rec.size() < 2:
+		return
+	DirAccess.make_dir_recursive_absolute("user://ghosts")
+	var f := FileAccess.open(_ghost_path(), FileAccess.WRITE)
+	if f:
+		f.store_var(_ghost_rec)
+
+
+## A see-through marble replaying your best run on this level.
+func _setup_ghost() -> void:
+	if _ghost:
+		_ghost.queue_free()
+		_ghost = null
+	_ghost_play = PackedVector3Array()
+	if not save_scores or not Settings.ghost or not FileAccess.file_exists(_ghost_path()):
+		return
+	var f := FileAccess.open(_ghost_path(), FileAccess.READ)
+	var data: Variant = f.get_var() if f else null
+	if not data is PackedVector3Array or data.size() < 2:
+		return
+	_ghost_play = data
+	_ghost = Node3D.new()
+	world.add_child(_ghost)
+	_ghost.global_position = _ghost_play[0]
+	Palette.load_model(_ghost, "ball")
+	Palette.tint(_ghost, Color("#8CC9F0"))
+	Palette.ghostify(_ghost, 0.55)
+	var tag := Label3D.new()
+	tag.text = "BEST"
+	tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	tag.font_size = 40
+	CandyText.style_3d(tag, Color(CandyText.PASTELS[4], 0.9))
+	tag.fixed_size = true
+	tag.pixel_size = 0.0011
+	tag.outline_modulate = Color(CandyText.CHOCOLATE, 0.6)
+	tag.position = Vector3.UP * 0.95
+	_ghost.add_child(tag)
+
+
+func _update_ghost() -> void:
+	if _ghost == null or _ghost_play.is_empty():
+		return
+	var f := level_time / GHOST_DT
+	var i := int(f)
+	if i >= _ghost_play.size() - 1:
+		_ghost.global_position = _ghost_play[_ghost_play.size() - 1]
+		_ghost.visible = false
+		return
+	_ghost.visible = true
+	_ghost.global_position = _ghost_play[i].lerp(_ghost_play[i + 1], f - i)
 
 
 ## Pinball toys call this. Only hits near the player count.
@@ -414,6 +567,9 @@ func _on_goal() -> void:
 	sfx.play("goal")
 	burst(ball.global_position + Vector3.UP * 0.8, [Palette.LEMON, Palette.PINK, Palette.MINT, Palette.LILAC, Palette.SKY], 60, 7.0)
 	var rank := scores.submit(_score_key(), level_time)
+	if rank == 0:
+		_record_ghost()
+		_save_ghost()
 	_update_best_label()
 	var medal := medal_for(level_time, level.time_limit)
 	var res := {
@@ -560,6 +716,7 @@ func _setup_input() -> void:
 		"left": [KEY_A, KEY_LEFT],
 		"right": [KEY_D, KEY_RIGHT],
 		"restart": [KEY_R],
+		"pause": [KEY_ESCAPE, KEY_P],
 	}
 	var axes := {
 		"up": [JOY_AXIS_LEFT_Y, -1.0],
@@ -580,9 +737,9 @@ func _setup_input() -> void:
 			jm.axis = axes[action][0]
 			jm.axis_value = axes[action][1]
 			InputMap.action_add_event(action, jm)
-		if action == "restart":
+		if action in ["restart", "pause"]:
 			var jb := InputEventJoypadButton.new()
-			jb.button_index = JOY_BUTTON_START
+			jb.button_index = JOY_BUTTON_BACK if action == "restart" else JOY_BUTTON_START
 			InputMap.action_add_event(action, jb)
 
 

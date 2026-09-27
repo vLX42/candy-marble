@@ -140,6 +140,8 @@ var _hover := Vector2i(-9999, -9999)
 var _hover_f := Vector2.ZERO
 var _hover_valid := false
 var _pending_target := -1
+## Waiting for a click on the map to start a test play there.
+var pending_test := false
 var _pan_button := -1
 var _pan_moved := 0.0
 var _press_pos := Vector2.ZERO
@@ -488,6 +490,8 @@ func set_tool(id: String) -> void:
 
 
 func tool_hint() -> String:
+	if pending_test:
+		return "Click where the marble should start the test play.  Esc cancels."
 	if _pending_target >= 0:
 		return "Click where the marble should land.  Esc cancels."
 	for t in TOOLS:
@@ -506,6 +510,14 @@ func _brush_tiles(c: Vector2i) -> Array[Vector2i]:
 
 
 func _stroke_begin(tile: Vector2i, f: Vector2, shift: bool) -> void:
+	if pending_test:
+		pending_test = false
+		ui.on_tool_changed()
+		if is_ground(tile.x, tile.y):
+			test_play(tile)
+		else:
+			ui.toast("Pick a tile with ground on it")
+		return
 	if _pending_target >= 0:
 		push_undo()
 		var e: Dictionary = lv.extras[_pending_target]
@@ -1402,7 +1414,7 @@ static func template(kind: String, level_title: String) -> Dictionary:
 
 # --- test play --------------------------------------------------------------------
 
-func test_play() -> void:
+func test_play(from: Vector2i = Vector2i(-1, -1)) -> void:
 	var p := problems()
 	if p.size() > 0 and (p[0].begins_with("No start") or p[0].begins_with("No hole")):
 		ui.toast(p[0])
@@ -1415,6 +1427,7 @@ func test_play() -> void:
 	session_tested = true
 	MainGame.quest = quest.duplicate_quest()
 	MainGame.test_mode = true
+	MainGame.test_start = from
 	MainGame.requested_level = li
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
 
@@ -2128,7 +2141,10 @@ func _on_key(key: InputEventKey) -> void:
 	elif ctrl and k == KEY_D:
 		duplicate_selection()
 	elif k == KEY_F5:
-		test_play()
+		if key.shift_pressed and _hover_valid and is_ground(_hover.x, _hover.y):
+			test_play(_hover)
+		else:
+			test_play()
 	elif k == KEY_TAB:
 		toggle_view()
 	elif k == KEY_R:
@@ -2136,7 +2152,10 @@ func _on_key(key: InputEventKey) -> void:
 	elif k == KEY_DELETE or k == KEY_BACKSPACE:
 		delete_selection()
 	elif k == KEY_ESCAPE:
-		if _pending_target >= 0:
+		if pending_test:
+			pending_test = false
+			ui.on_tool_changed()
+		elif _pending_target >= 0:
 			_pending_target = -1
 			ui.on_tool_changed()
 		elif not selection.is_empty():

@@ -18,6 +18,7 @@ func _initialize() -> void:
 	main = load("res://scenes/main.tscn").instantiate()
 	main.first_level = level - 1
 	main.save_scores = false
+	main.countdown = false
 	root.add_child(main)
 
 

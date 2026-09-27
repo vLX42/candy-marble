@@ -53,8 +53,6 @@ func _ready() -> void:
 	_list = ItemList.new()
 	_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_list.add_theme_font_size_override("font_size", 24)
-	_list.max_text_lines = 2
-	_list.auto_height = false
 	_list.item_selected.connect(func(i: int) -> void: _show(_quests[i]))
 	left.add_child(_list)
 	var g := GridContainer.new()
@@ -108,8 +106,8 @@ func refresh(select_id: String = "") -> void:
 	var pick := 0
 	for k in _quests.size():
 		var q := _quests[k]
-		var by := ("  by " + q.author) if q.author != "" else ""
-		_list.add_item("%s%s\n%d level%s" % [q.name, by, q.levels.size(), "" if q.levels.size() == 1 else "s"])
+		var by := (", by " + q.author) if q.author != "" else ""
+		_list.add_item("%s%s  (%d level%s)" % [q.name, by, q.levels.size(), "" if q.levels.size() == 1 else "s"])
 		if q.id == select_id:
 			pick = k
 	if _quests.is_empty():

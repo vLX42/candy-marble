@@ -177,10 +177,10 @@ def terrace_falls():
     m.put(31, 25, "G")
     m.put(33, 23, "%")
     m.put(33, 27, "g")
-    m.way((3.5, 3.5), (3.5, 6), (3.5, 17.5), (4, 20), (10, 23.5), (15, 23.5), (21, 23.5), (25, 25), (31, 25))
+    m.way((3.5, 3.5), (3.5, 6), (3.5, 17.5), (4, 20), (7, 22.5), (15, 23.5), (21, 23.5), (25, 25), (31, 25))
     return m.level("Terrace Falls",
                    "Down the long ramp, past pyramids and green slinkies, then hop down the terraces.",
-                   36, "Candy", break_drop=2, step=1.0, monster_tint="#6fd13a")
+                   26, "Candy", break_drop=2, step=1.0, monster_tint="#6fd13a")
 
 
 # --- 3. Goo Gorge -----------------------------------------------------------------------
@@ -330,7 +330,8 @@ if __name__ == "__main__":
         "format": "candy-quest", "version": 1, "id": "sample_marble_madness",
         "name": "Marble Madness", "author": "Candy Marble",
         "description": "Five tall, twisty courses in the spirit of the 1984 arcade classic: spirals, terraces, goo, catwalks and a race to the bottom. Big drops break the marble!",
-        "created": 0, "updated": 0,
+        # Bump "updated" when the levels change: untouched installed copies update.
+        "created": 0, "updated": 2,
         "levels": [f() for f in LEVELS],
     }
     os.makedirs(os.path.dirname(OUT), exist_ok=True)

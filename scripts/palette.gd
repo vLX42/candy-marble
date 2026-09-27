@@ -127,3 +127,18 @@ static func tint(node: Node, color: Color) -> void:
 			mi.material_override = d
 		else:
 			mi.set_surface_override_material(slot[1], d)
+
+
+## Makes every mesh under `node` see-through (the best-run ghost marble).
+static func ghostify(node: Node, alpha: float) -> void:
+	for mi: MeshInstance3D in node.find_children("*", "MeshInstance3D", true, false):
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		for s in mi.mesh.get_surface_count():
+			var m := mi.get_active_material(s) as BaseMaterial3D
+			if m == null:
+				continue
+			var d := m.duplicate() as BaseMaterial3D
+			d.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			d.albedo_color.a = alpha
+			d.clearcoat_enabled = false
+			mi.set_surface_override_material(s, d)

@@ -1,9 +1,9 @@
 extends SceneTree
 ## Track sections, the Road tool and the guide.
 ##   godot --headless --fixed-fps 120 -s tests/sections_test.gd
-## Also writes user://quests/testsections.candyquest, a level built only from
-## sections, for the bot:
-##   godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=user://quests/testsections.candyquest
+## Also writes user://sections_test.candyquest (outside the quest folder), a
+## level built only from sections, for the bot:
+##   godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=user://sections_test.candyquest
 
 var results: Array[String] = []
 var failed := false
@@ -27,6 +27,8 @@ func _process(_delta: float) -> bool:
 		_build_track()
 		_road()
 		_check("all checks ran", results.size() >= 20, "%d checks" % results.size())
+		# Keep the player's quest list clean.
+		ed.quest.delete()
 		print("\n".join(results))
 		print("SECTIONS TEST ", "FAILED" if failed else "PASSED")
 		quit(1 if failed else 0)
@@ -90,7 +92,9 @@ func _build_track() -> void:
 	_check("click placement grows the map and sets a new open end", ed.rows() > before and ed.track_end()[2] == 1,
 		"rows %d -> %d end %s" % [before, ed.rows(), ed.track_end()])
 	ed.undo()
-	ed.quest.save()
+	var built_only := Quest.from_dict(ed.quest.to_dict())
+	built_only.levels = [built_only.levels[0]]
+	built_only.write_to("user://sections_test.candyquest")
 
 
 func _road() -> void:

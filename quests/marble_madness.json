@@ -6,7 +6,7 @@
 	"author": "Candy Marble",
 	"description": "Five tall, twisty courses in the spirit of the 1984 arcade classic: spirals, terraces, goo, catwalks and a race to the bottom. Big drops break the marble!",
 	"created": 0,
-	"updated": 0,
+	"updated": 2,
 	"levels": [
 		{
 			"title": "Spiral Summit",
@@ -235,7 +235,7 @@
 		{
 			"title": "Terrace Falls",
 			"description": "Down the long ramp, past pyramids and green slinkies, then hop down the terraces.",
-			"par": 36,
+			"par": 26,
 			"race": false,
 			"heights": [
 				"....................................",
@@ -376,8 +376,8 @@
 					20.0
 				],
 				[
-					10.0,
-					23.5
+					7.0,
+					22.5
 				],
 				[
 					15.0,

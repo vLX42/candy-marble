@@ -14,6 +14,7 @@ func _initialize() -> void:
 	main.auto_advance = false
 
 	main.save_scores = false
+	main.countdown = false
 	root.add_child(main)
 	for li in main.LEVELS.size():
 		var n: int = main.LEVELS[li].new().route.size()

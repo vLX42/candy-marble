@@ -317,8 +317,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _build_settings(root: Control) -> void:
 	_settings_panel = VBoxContainer.new()
-	_settings_panel.position = Vector2(84, 380)
-	_settings_panel.add_theme_constant_override("separation", 10)
+	_settings_panel.position = Vector2(84, 332)
+	_settings_panel.add_theme_constant_override("separation", 8)
 	_settings_panel.visible = false
 	root.add_child(_settings_panel)
 
@@ -338,6 +338,9 @@ func _build_settings(root: Control) -> void:
 	_settings_panel.add_child(_setting_button(func() -> String:
 		return "Fullscreen: %s" % ("on" if Settings.fullscreen else "off"),
 		func() -> void: Settings.toggle_fullscreen()))
+	_settings_panel.add_child(_setting_button(func() -> String:
+		return "Best-run ghost: %s" % ("on" if Settings.ghost else "off"),
+		func() -> void: Settings.set_value("ghost", not Settings.ghost)))
 	var reset := _button("Reset best times and unlocks", func() -> void: pass)
 	reset.pressed.connect(func() -> void:
 		if _reset_armed:
@@ -347,16 +350,20 @@ func _build_settings(root: Control) -> void:
 		else:
 			_reset_armed = true
 			reset.text = "Sure? Press again to reset")
-	reset.add_theme_font_size_override("font_size", 28)
-	_settings_panel.add_child(reset)
-	_settings_panel.add_child(_button("Back", _show_menu))
+	reset.add_theme_font_size_override("font_size", 24)
+	var back := _button("Back", _show_menu)
+	back.add_theme_font_size_override("font_size", 24)
+	var row := _pair(reset, back)
+	row.custom_minimum_size.x = 620
+	reset.size_flags_stretch_ratio = 2.2
+	_settings_panel.add_child(row)
 
 
 ## A button whose label comes from `label` and refreshes after `action`.
 func _setting_button(label: Callable, action: Callable) -> Button:
 	var b := _button(label.call(), func() -> void: pass)
 	b.custom_minimum_size = Vector2(620, 0)
-	b.add_theme_font_size_override("font_size", 30)
+	b.add_theme_font_size_override("font_size", 26)
 	b.pressed.connect(func() -> void:
 		action.call()
 		b.text = label.call()
@@ -370,14 +377,14 @@ func _slider(title: String, value: float, on_change: Callable) -> Control:
 	var l := Label.new()
 	l.text = title
 	l.custom_minimum_size = Vector2(150, 0)
-	CandyText.style(l, 30)
+	CandyText.style(l, 26)
 	row.add_child(l)
 	var s := HSlider.new()
 	s.min_value = 0.0
 	s.max_value = 1.0
 	s.step = 0.05
 	s.value = value
-	s.custom_minimum_size = Vector2(450, 40)
+	s.custom_minimum_size = Vector2(450, 34)
 	s.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	s.value_changed.connect(on_change)
 	row.add_child(s)

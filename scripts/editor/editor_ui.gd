@@ -147,6 +147,9 @@ func _build_top_bar() -> void:
 	var play := _btn("Test play", ed.test_play, "F5: play this level. Esc in the game comes back here.")
 	play.add_theme_stylebox_override("normal", _colored(play, Palette.MINT))
 	row.add_child(play)
+	row.add_child(_btn("From here", func() -> void:
+		ed.pending_test = true
+		on_tool_changed(), "Test play starting on a tile you click (Shift+F5 over a tile)"))
 	row.add_child(_btn("Menu", ed.exit_to_menu, "Save and go back to the quests"))
 
 
@@ -316,7 +319,7 @@ func _build_help() -> void:
 		["Ctrl+D", "duplicate it"],
 		["Ctrl+Z / Ctrl+Y", "undo / redo"],
 		["Ctrl+S", "save"],
-		["F5", "test play, Esc comes back"],
+		["F5 / Shift+F5", "test play / from the tile under the mouse"],
 	]
 	for list: Array in [left, right]:
 		var g := GridContainer.new()
