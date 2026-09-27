@@ -82,6 +82,10 @@ class Course:
                 d["target_tile"] = self._world(*e["target_tile"])
             if "yaw" in d:
                 d["yaw"] = (d["yaw"] - 90.0 * self.h) % 360.0
+            if "travel_tiles" in d:
+                tx, tz = d.pop("travel_tiles")
+                f, l = F[self.h], L[self.h]
+                d["travel"] = ((tx * f[0] + tz * l[0]) * 2.0, (tx * f[1] + tz * l[1]) * 2.0)
             if "y_tier" in d:
                 d["y"] = (self.tier - p.entry + d.pop("y_tier")) * 0.5
             if "rise" in d:
@@ -157,6 +161,8 @@ class Course:
             for k, v in e.items():
                 if k in ("tile", "target_tile"):
                     v = f"Vector2({v[0] + sx}, {v[1] + sz})"
+                elif k == "travel":
+                    v = f"Vector3({v[0]}, 0, {v[1]})"
                 elif isinstance(v, str):
                     v = f'"{v}"'
                 elif isinstance(v, float):

@@ -32,12 +32,17 @@ the menu, F11 or Alt+Enter for fullscreen.
 
 | # | Level | Par | What's in it |
 |---|---|---|---|
-| 1 | Sugar Lane | 105 s | A descent from the top of the candy hills, every stretch different: slope, slalom, stairs, the candy chute, a speed funnel, a split path, a leap down, a loop, a river |
-| 2 | Gumdrop Pinball | 130 s | RACE. Bumper tables, slingshots, speed-bank corners and loops |
-| 3 | Sprinkle Skies | 100 s | Island hopping: kicker jumps through hoops, cannon hops, sweeper bridges |
-| 4 | Licorice Loops | 210 s | Loops, candy rivers and drops, sweepers on every other bend |
-| 5 | Candy Castle | 165 s | RACE. The long climb: ramps up past fast sweepers, bridges, kickers and cannons |
-| 6 | Pinball Parlor | 115 s | Speed run: tables, cannons, loops, speed banks |
+| 1 | Sugar Lane | 105 s | A descent from the top of the candy hills: slope, slalom, stairs, the candy chute, a leap, a loop, a river |
+| 2 | Gumdrop Pinball | 80 s | RACE. Pinball park: tables, windmills, a loop, stairs, a catapult |
+| 3 | Sprinkle Skies | 75 s | Island hopping: kickers, hoppers, a cannon, a leap, a ghost garden, a catapult |
+| 4 | Licorice Loops | 90 s | Stompers, the candy chute, windmills and haunted hills on the way down |
+| 5 | Candy Castle | 110 s | RACE up the castle: hoppers, stompers, cannons, windmills, ghosts, a catapult |
+| 6 | Pinball Parlor | 125 s | Speed run through every toy in the park |
+
+**Hazards**: sweepers (wind-up blocks), gumdrop hoppers (go under mid-hop),
+marshmallow stompers (pass while they're up), sour ghosts (they chase you,
+then get tired), licorice windmills (they swat, they don't pop).
+**Launchers**: boosters, loops, cannons, the spoon catapult, the candy chute.
 
 ## Making levels
 
@@ -65,6 +70,7 @@ $B -b -P blender/build_assets.py      # ball, enemy, bumper, booster, flag, loop
 $B -b -P blender/assets_pinball.py    # slingshot, cannon, spinner, rollover, hoop, rails, targets
 $B -b -P blender/assets_candy.py      # candies used as floating decor
 $B -b -P blender/assets_scenery.py    # castle, gingerbread house, ferris wheel, ...
+$B -b -P blender/assets_enemies.py    # hopper, stomper, ghost, windmill, catapult
 ```
 
 Every entity loads `models/<name>.glb` and falls back to a primitive
@@ -82,6 +88,7 @@ last level.
 godot --headless --fixed-fps 120 -s tests/playtest.gd      # mechanics
 godot --headless --fixed-fps 120 -s tests/levels_test.gd   # bot plays every level
 godot --headless --fixed-fps 120 -s tests/race_test.gd     # race win / 2nd place outcomes
+godot --headless --fixed-fps 120 -s tests/hazards_test.gd  # stomper, hopper, ghost, windmill, catapult
 godot --always-on-top -s tests/shots.gd                   # screenshots to tests/shots/
 godot --always-on-top -s tests/perf.gd -- --level=4       # fps, triangles, draw calls
 ```

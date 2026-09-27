@@ -8,6 +8,9 @@ extends AnimatableBody3D
 @export var period := 2.6            # seconds for a full back-and-forth
 @export_range(0.0, 1.0) var phase := 0.0
 
+## Hit distance for the AI's look-ahead.
+var reach := 1.15
+
 var _origin := Vector3.ZERO
 var _time := 0.0
 var _visual: Node3D
@@ -77,6 +80,10 @@ func _physics_process(delta: float) -> void:
 func position_at(ahead: float) -> Vector3:
 	var t := (_time + ahead) / period * TAU
 	return _origin + travel * (1.0 - cos(t)) * 0.5
+
+
+func threat_at(ahead: float) -> Variant:
+	return position_at(ahead)
 
 
 func _on_hit(body: Node3D) -> void:

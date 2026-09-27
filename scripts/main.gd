@@ -25,6 +25,11 @@ const SCENES := {
 	"pinball": preload("res://scenes/pinball.tscn"),
 	"rival": preload("res://scenes/rival.tscn"),
 	"chute": preload("res://scenes/chute.tscn"),
+	"hopper": preload("res://scenes/hopper.tscn"),
+	"stomper": preload("res://scenes/stomper.tscn"),
+	"ghost": preload("res://scenes/ghost.tscn"),
+	"windmill": preload("res://scenes/windmill.tscn"),
+	"catapult": preload("res://scenes/catapult.tscn"),
 }
 ## Sugar Rush: pinball hits fill the meter; full = a few seconds of rush.
 const RUSH_HITS := 6.0
@@ -417,6 +422,13 @@ func on_bump(pos: Vector3) -> void:
 	sfx.play("boing")
 	_shake = maxf(_shake, 0.12)
 	charge(1.0, pos)
+
+
+func on_stomp(pos: Vector3) -> void:
+	var d := pos.distance_to(ball.global_position) if ball else 99.0
+	if d < 14.0:
+		sfx.play("pop", -14.0 + (14.0 - d))
+		_shake = maxf(_shake, 0.25 * (1.0 - d / 14.0))
 
 
 func on_boost(pos: Vector3) -> void:

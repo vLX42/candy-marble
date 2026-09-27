@@ -337,6 +337,79 @@ def split():
     return Piece(rows(h), rows(o), route=[(0, 2.5), (1.5, 4), (8.5, 4), (9, 2.5)], name="split")
 
 
+# --- enemy and catapult pieces ----------------------------------------------------------
+
+def hopper_lane():
+    """Two gumdrop hoppers bouncing across the lane: go under them mid-hop."""
+    W = 10
+    h, o = lane(W), grid(W)
+    rail_decor(o, W, seed())
+    return Piece(rows(h), rows(o), extras=[
+        {"type": "hopper", "tile": (3, 1), "travel_tiles": (0, 3), "period": 3.6, "hops": 2},
+        {"type": "hopper", "tile": (7, 4), "travel_tiles": (0, -3), "period": 3.0, "hops": 2, "phase": 0.5},
+    ], route=[(0, 2.5), (W - 1, 2.5)], name="hopper_lane")
+
+
+def stomper_gate():
+    """A one-tile corridor under three marshmallow stompers in a rolling rhythm."""
+    W = 11
+    h, o = lane(W), grid(W)
+    for x in range(1, W - 1):
+        for z in (1, 3, 4):
+            h[z][x] = "1"
+    o[1][2], o[4][6], o[1][9] = "l", "g", "t"
+    return Piece(rows(h), rows(o), extras=[
+        {"type": "stomper", "tile": (3, 2), "period": 2.8, "phase": 0.0},
+        {"type": "stomper", "tile": (5.5, 2), "period": 2.8, "phase": 0.3},
+        {"type": "stomper", "tile": (8, 2), "period": 2.8, "phase": 0.6},
+    ], route=[(0, 2.5), (1, 2), (W - 2, 2), (W - 1, 2.5)], name="stomper_gate")
+
+
+def ghost_garden():
+    """Candy garden with hills where two sour ghosts drift after you."""
+    W = 12
+    h, o = lane(W), grid(W)
+    o[4][2], o[1][9] = "H", "H"
+    o[0][4], o[5][7], o[0][10] = "t", "l", "%"
+    return Piece(rows(h), rows(o), extras=[
+        {"type": "ghost", "tile": (4, 1), "leash": 4.5},
+        {"type": "ghost", "tile": (8, 4), "leash": 4.5},
+    ], route=[(0, 2.5), (W - 1, 2.5)], name="ghost_garden")
+
+
+def windmill_plaza():
+    """Two licorice windmills spinning opposite ways: time your pass."""
+    W = 13
+    h, o = lane(W), grid(W)
+    o[0][6], o[5][6] = "%", "g"
+    return Piece(rows(h), rows(o), extras=[
+        {"type": "windmill", "tile": (3, 2.5), "spin": 1.2},
+        {"type": "windmill", "tile": (9, 2.5), "spin": -1.4},
+    ], route=[(0, 2.5), (W - 1, 2.5)], name="windmill_plaza")
+
+
+def catapult_launch():
+    """Funnel into the spoon, get flung in a high arc to a lower island."""
+    W = 15
+    h, o = grid(W), grid(W)
+    for x in range(0, 2):
+        h[0][x] = h[5][x] = "2"
+        for z in range(1, 5):
+            h[z][x] = "1"
+    for x in range(2, 5):
+        for z in range(6):
+            h[z][x] = "2"
+        h[2][x] = "1"
+    for x in range(9, W):
+        h[0][x] = h[5][x] = "1"
+        for z in range(1, 5):
+            h[z][x] = "0"
+    o[0][10], o[5][12] = "t", "l"
+    return Piece(rows(h), rows(o), entry=1, exit=0, extras=[
+        {"type": "catapult", "tile": (4, 2), "target_tile": (11, 2.5)},
+    ], route=[(0, 2.5), (2, 2), (3.2, 2), (11, 2.5), (13, 2.5)], name="catapult_launch")
+
+
 # --- levels -------------------------------------------------------------------------
 
 def build(num, title, desc, par, tier, plan, race=False):
@@ -359,40 +432,31 @@ def main():
         T(+1), checkpoint(), leap(1), bridge(8, sweep=False), spinners(), loop(), T(-1), river(), kicker(),
         drop(), finish(),
     ])
-    build(2, "Gumdrop Pinball", "RACE vs the licorice ball. Bumper tables, slingshots, speed-bank corners and loops, down a long pinball run.", 130, 5, [
-        start(), ramp_down(), table(), T(+1, True), bumpers(), checkpoint(), sweepers(2), loop(),
-        T(-1, True), table(), straight(3), ramp_down(), bumpers(), T(+1, True), checkpoint(), spinners(),
-        table(), loop(), T(-1, True), river(), drop(), bumpers(), sweepers(2, True), T(+1, True),
-        checkpoint(), table(), waves(6), loop(), T(-1, True), bumpers(), straight(3), finish(),
+    build(2, "Gumdrop Pinball", "RACE vs the licorice ball through a pinball park: tables, windmills, a loop, a catapult.", 80, 6, [
+        start(), ramp_down(), table(), T(+1, True), bumpers(), checkpoint(), windmill_plaza(), loop(),
+        T(-1, True), funnel(), spinners(), stairs(2), T(+1, True), checkpoint(), slalom(), catapult_launch(),
+        T(-1, True), waves(6), river(), finish(),
     ], race=True)
-    build(3, "Sprinkle Skies", "Island hopping: kicker jumps through hoops, cannon hops over the void, sweeper bridges.", 100, 1, [
-        start(), straight(3), kicker(), T(+1), bridge(), checkpoint(), cannon_hop(), T(-1), sweepers(2),
-        kicker(), straight(3), T(+1), checkpoint(), bridge(8), ramp_down(), waves(6), T(-1), cannon_hop(),
-        checkpoint(), kicker(), T(+1), bridge(), sweepers(2, True), T(-1), checkpoint(), cannon_hop(),
-        straight(3), finish(),
+    build(3, "Sprinkle Skies", "Island hopping: kickers, a hopper lane, a cannon, a leap, a ghost garden and a catapult.", 75, 2, [
+        start(), kicker(), T(+1), bridge(), checkpoint(), hopper_lane(), cannon_hop(), T(-1), leap(1),
+        ghost_garden(), checkpoint(), T(+1), catapult_launch(), split(), T(-1), sweepers(2, True),
+        slope_down(1), finish(),
     ])
-    build(4, "Licorice Loops", "Loops, candy rivers and drops, with sweepers guarding every other bend.", 210, 7, [
-        start(), river(), drop(), T(+1), loop(), sweepers(2), checkpoint(), river(10), T(-1), drop(),
-        loop(), hills(), T(+1), checkpoint(), sweepers(2, True), river(), drop(), T(-1), waves(8), loop(),
-        T(+1), checkpoint(), bridge(), river(), drop(), T(-1), sweepers(3), loop(), T(+1), checkpoint(),
-        hills(), river(), drop(), T(-1), loop(), sweepers(2, True), bridge(), T(+1), checkpoint(),
-        river(10), waves(6), loop(), T(-1), hills(), sweepers(3), river(), T(+1), checkpoint(),
-        bridge(8), loop(), straight(3), finish(),
+    build(4, "Licorice Loops", "Down through the licorice works: stompers, the candy chute, windmills and haunted hills.", 90, 8, [
+        start(), river(), drop(), T(+1), loop(), stomper_gate(), checkpoint(), T(-1), chute_drop(),
+        windmill_plaza(), T(+1), checkpoint(), ghost_garden(), hills(), T(-1), stairs(2), sweepers(3),
+        T(+1), checkpoint(), waves(6), slope_down(1), finish(),
     ])
-    build(5, "Candy Castle", "RACE vs the licorice ball. The long climb: ramps up tier after tier past fast sweepers, bridges and kickers to the top.", 165, 0, [
-        start(), straight(3), ramp_up(), sweepers(2), T(+1), bridge(), ramp_up(), checkpoint(), loop(),
-        T(-1), sweepers(2, True), ramp_up(), kicker(), T(+1), checkpoint(), bridge(8), hills(),
-        T(-1), sweepers(3, True), checkpoint(), cannon_hop(), T(+1), bumpers(), ramp_up(), loop(), T(-1),
-        checkpoint(), bridge(), sweepers(2, True), kicker(), T(+1), waves(6), bumpers(), T(-1),
-        checkpoint(), bridge(8), sweepers(3, True), loop(), T(+1), cannon_hop(), hills(), straight(3), finish(),
+    build(5, "Candy Castle", "RACE vs the licorice ball up the castle: hoppers, stompers, cannons and a catapult.", 110, 0, [
+        start(), ramp_up(), sweepers(2), T(+1), bridge(), checkpoint(), hopper_lane(), kicker(), T(-1),
+        stomper_gate(), cannon_hop(), T(+1), checkpoint(), windmill_plaza(), ghost_garden(), T(-1), loop(),
+        catapult_launch(), T(+1), checkpoint(), funnel(), ramp_up(), finish(),
     ], race=True)
-    build(6, "Pinball Parlor", "Pure speed run: tables, cannons, loops and speed banks. Keep it rolling.", 115, 4, [
-        start(), table(), T(+1, True), loop(), cannon_hop(), T(-1, True), table(), spinners(), checkpoint(),
-        loop(), T(+1, True), table(), ramp_down(), cannon_hop(), T(-1, True), checkpoint(), bumpers(),
-        loop(), T(+1, True), table(), spinners(), cannon_hop(), T(-1, True), checkpoint(), table(), loop(),
-        finish(),
+    build(6, "Pinball Parlor", "Speed run through every pinball toy in the park: tables, cannons, windmills, stompers, a catapult.", 125, 5, [
+        start(), table(), T(+1, True), loop(), cannon_hop(), T(-1, True), bumpers(), spinners(), checkpoint(),
+        windmill_plaza(), catapult_launch(), T(+1, True), funnel(), stomper_gate(), checkpoint(), T(-1, True),
+        slalom(), hopper_lane(), split(), finish(),
     ])
-
 
 if __name__ == "__main__":
     main()

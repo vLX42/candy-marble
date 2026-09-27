@@ -132,9 +132,9 @@ func _safe(pos: Vector2, vel: Vector2, push: Vector2) -> bool:
 	const STEP := 0.05
 	const ACCEL := 11.0
 	const REACH := 1.15  # ball radius + half enemy hitbox + margin
-	var near: Array[Enemy] = []
-	for e: Enemy in get_nodes_in_group("enemy"):
-		if _flat(e.global_position).distance_to(pos) < 8.0:
+	var near: Array[Node3D] = []
+	for e: Node3D in get_nodes_in_group("enemy"):
+		if e.has_method("threat_at") and _flat(e.global_position).distance_to(pos) < 9.0:
 			near.append(e)
 	if near.is_empty():
 		return true
@@ -149,8 +149,12 @@ func _safe(pos: Vector2, vel: Vector2, push: Vector2) -> bool:
 			v = (v + push * ACCEL * STEP).limit_length(8.0)
 		p += v * STEP
 		for e in near:
-			var ep := _flat(e.position_at(t))
-			if absf(ep.x - p.x) < REACH and absf(ep.y - p.y) < REACH:
+			var threat: Variant = e.threat_at(t)
+			if threat == null:
+				continue
+			var ep := _flat(threat)
+			var reach: float = e.get("reach") if e.get("reach") != null else REACH
+			if absf(ep.x - p.x) < reach and absf(ep.y - p.y) < reach:
 				return false
 	return true
 
