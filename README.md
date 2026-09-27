@@ -7,8 +7,11 @@ Roll the peppermint ball to the golf hole as fast as you can. Your score is
 your time: each level has a par (gold medal), silver at 1.3x and bronze at 1.7x
 par. Best level times and best full runs are saved locally.
 
-- **Title screen** with Play / Continue, level select (best times, medals),
-  fullscreen toggle. Levels unlock one by one as you finish them.
+- **Title screen** with Play / Continue, level select (best times, medals)
+  and settings. Levels unlock one by one as you finish them.
+- **Settings**: camera follows the track (default, the playfield turns so the
+  way ahead points up the screen) or fixed isometric, zoom, music and effects
+  volume, graphics high/fast, fullscreen, reset progress.
 - **Races**: on some levels the evil licorice ball races you to the hole. It
   uses boosters, loops and cannons too, and you can bump each other around.
   Win the race to clear the level.
@@ -29,7 +32,7 @@ the menu, F11 or Alt+Enter for fullscreen.
 
 | # | Level | Par | What's in it |
 |---|---|---|---|
-| 1 | Sugar Lane | 155 s | Long friendly tour with rails: waves, hills, bumpers, loops, rivers, jumps |
+| 1 | Sugar Lane | 105 s | A descent from the top of the candy hills, every stretch different: slope, slalom, stairs, the candy chute, a speed funnel, a split path, a leap down, a loop, a river |
 | 2 | Gumdrop Pinball | 130 s | RACE. Bumper tables, slingshots, speed-bank corners and loops |
 | 3 | Sprinkle Skies | 100 s | Island hopping: kicker jumps through hoops, cannon hops, sweeper bridges |
 | 4 | Licorice Loops | 210 s | Loops, candy rivers and drops, sweepers on every other bend |

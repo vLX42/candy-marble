@@ -38,6 +38,12 @@ func submit(key: String, time: float) -> int:
 	return t.find(snappedf(time, 0.01))
 
 
+func reset() -> void:
+	_cfg.clear()
+	if persist:
+		_cfg.save(PATH)
+
+
 ## How many levels are playable (level 1 is always unlocked).
 func unlocked() -> int:
 	return int(_cfg.get_value("progress", "unlocked", 1))

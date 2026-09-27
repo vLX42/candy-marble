@@ -24,6 +24,7 @@ const SCENES := {
 	"loop": preload("res://scenes/loop.tscn"),
 	"pinball": preload("res://scenes/pinball.tscn"),
 	"rival": preload("res://scenes/rival.tscn"),
+	"chute": preload("res://scenes/chute.tscn"),
 }
 ## Sugar Rush: pinball hits fill the meter; full = a few seconds of rush.
 const RUSH_HITS := 6.0
@@ -34,11 +35,12 @@ const MEDALS := [[1.0, "GOLD"], [1.3, "SILVER"], [1.7, "BRONZE"]]
 const SkyShader := preload("res://scripts/sky.gdshader")
 
 const CAMERA_ROTATION := Vector3(-35.264, 45.0, 0.0)  # true isometric
-const CAMERA_SIZE := 18.0
 const CAMERA_FOLLOW := 5.0
+## How fast the playfield turns to follow the track (follow camera setting).
+const CAMERA_TURN := 1.6
 const NEXT_LEVEL_DELAY := 3.0
 ## Entity dictionary keys that are not node properties.
-const META_KEYS := ["type", "pos", "yaw", "ground_tile"]
+const META_KEYS := ["type", "pos", "yaw", "ground_tile", "y"]
 
 ## Set by the title screen before switching to this scene (-1 = use first_level).
 static var requested_level := -1
@@ -81,6 +83,9 @@ var _message_token := 0
 ## Shown again when a timed message runs out (e.g. "the rival won").
 var _sticky_message := ""
 var _shake := 0.0
+var _cam_yaw := deg_to_rad(45.0)
+var _env: Environment
+var _sun: DirectionalLight3D
 
 
 func _ready() -> void:
@@ -121,6 +126,7 @@ func play_music(track: String) -> void:
 	stream.loop = true
 	var old := _music
 	_music = AudioStreamPlayer.new()
+	_music.bus = "Music"
 	_music.stream = stream
 	_music.volume_db = -40.0
 	add_child(_music)
@@ -185,6 +191,8 @@ func load_level(data: LevelBase) -> void:
 			node.reached.connect(_on_goal)
 			node.rival_reached.connect(_on_rival_goal)
 
+	_cam_yaw = _track_yaw() if Settings.camera_follow else deg_to_rad(45.0)
+	camera.rotation = Vector3(deg_to_rad(CAMERA_ROTATION.x), _cam_yaw, 0.0)
 	camera.global_position = _camera_target()
 	_update_best_label()
 	var intro := "%s\npar %.0f s" % [level.title, level.time_limit]
@@ -199,6 +207,8 @@ func _place(e: Dictionary) -> Node3D:
 	if e.has("ground_tile"):
 		var gt: Vector2i = e.ground_tile
 		node.position.y = level.surface(gt.x, gt.y, (gt.x + 0.5) * LevelBase.TILE, (gt.y + 0.5) * LevelBase.TILE)
+	if e.has("y"):
+		node.position.y = e.y
 	if e.type == "goal":
 		node.position.y = level.height(e.pos.x + LevelBase.HOLE_RADIUS + 0.05, e.pos.y)
 	node.rotation_degrees.y = e.get("yaw", 0.0)
@@ -234,6 +244,10 @@ func _process(delta: float) -> void:
 			place = "LOST"
 		_hud_level.text += "\nRACE  %s" % place
 
+	var target_yaw := _track_yaw() if Settings.camera_follow else deg_to_rad(45.0)
+	_cam_yaw = lerp_angle(_cam_yaw, target_yaw, 1.0 - exp(-CAMERA_TURN * delta))
+	camera.rotation = Vector3(deg_to_rad(CAMERA_ROTATION.x), _cam_yaw, 0.0)
+	camera.size = lerpf(camera.size, Settings.camera_size(), 1.0 - exp(-3.0 * delta))
 	var k := 1.0 - exp(-CAMERA_FOLLOW * delta)
 	camera.global_position = camera.global_position.lerp(_camera_target(), k)
 	if _shake > 0.0:
@@ -310,6 +324,26 @@ func _on_rival_goal() -> void:
 	cheer("RIVAL WINS", rival.global_position + Vector3.UP * 1.5)
 	_sticky_message = "The licorice ball got there first!\nR to race again"
 	show_message(_sticky_message)
+
+
+## Camera yaw that points the track just ahead of the ball up the screen.
+func _track_yaw() -> float:
+	if _route_world.size() < 2 or ball == null:
+		return _cam_yaw
+	var p := LevelBase.route_progress(_route_world, Vector2(ball.global_position.x, ball.global_position.z))
+	var here := _route_point(p)
+	var ahead := _route_point(p + 1.5)
+	var d := ahead - here
+	if d.length() < 0.5:
+		return _cam_yaw
+	# Camera forward (-basis.z) along d: the track ahead points up the screen,
+	# so "up" on the stick always means "forward".
+	return atan2(-d.x, -d.y)
+
+
+func _route_point(progress: float) -> Vector2:
+	var i := clampi(int(progress), 0, _route_world.size() - 2)
+	return _route_world[i].lerp(_route_world[i + 1], clampf(progress - i, 0.0, 1.5))
 
 
 func _camera_target() -> Vector3:
@@ -531,6 +565,7 @@ func _setup_environment() -> void:
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
+	_env = env
 
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-55.0, 25.0, 0.0)
@@ -539,12 +574,15 @@ func _setup_environment() -> void:
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 90.0
 	add_child(sun)
+	_sun = sun
+	Settings.apply_graphics(_env, _sun)
+	Settings.changed.connect(func() -> void: Settings.apply_graphics(_env, _sun))
 
 
 func _setup_camera() -> void:
 	camera = Camera3D.new()
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-	camera.size = CAMERA_SIZE
+	camera.size = Settings.camera_size()
 	camera.far = 200.0
 	camera.rotation_degrees = CAMERA_ROTATION
 	add_child(camera)

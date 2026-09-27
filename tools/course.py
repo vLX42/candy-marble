@@ -82,6 +82,8 @@ class Course:
                 d["target_tile"] = self._world(*e["target_tile"])
             if "yaw" in d:
                 d["yaw"] = (d["yaw"] - 90.0 * self.h) % 360.0
+            if "y_tier" in d:
+                d["y"] = (self.tier - p.entry + d.pop("y_tier")) * 0.5
             if "rise" in d:
                 d["height"] = (self.tier - p.entry + d.pop("base", p.entry)) * 0.5 + d.pop("rise")
             self.extras.append(d)

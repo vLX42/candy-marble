@@ -45,6 +45,8 @@ var _t := 0.0
 var _scores := Scores.new()
 var _menu: VBoxContainer
 var _levels_panel: VBoxContainer
+var _settings_panel: VBoxContainer
+var _reset_armed := false
 var _fullscreen_button: Button
 var _theme := Theme.new()
 
@@ -168,8 +170,7 @@ func _build_ui() -> void:
 	else:
 		_menu.add_child(play)
 	_menu.add_child(_button("Levels", _show_levels))
-	_fullscreen_button = _button("", _toggle_fullscreen)
-	_menu.add_child(_fullscreen_button)
+	_menu.add_child(_button("Settings", _show_settings))
 	_menu.add_child(_button("Quit", func() -> void: get_tree().quit()))
 	var runs: Array = _scores.top("run")
 	if runs.size() > 0:
@@ -208,6 +209,7 @@ func _build_ui() -> void:
 		b.add_theme_font_size_override("font_size", 24)
 		grid.add_child(b)
 	_levels_panel.add_child(_button("Back", _show_menu))
+	_build_settings(root)
 
 	var hint := Label.new()
 	hint.text = "WASD / arrows / stick to roll    R restart    Esc menu    F11 fullscreen"
@@ -256,6 +258,19 @@ func _setup_theme() -> void:
 	_theme.set_color("font_focus_color", "Button", Palette.INK)
 	_theme.set_color("font_pressed_color", "Button", Palette.INK)
 	_theme.set_font_size("font_size", "Button", 38)
+	var track := StyleBoxFlat.new()
+	track.bg_color = Color(1, 1, 1, 0.75)
+	track.set_corner_radius_all(10)
+	track.content_margin_top = 6
+	track.content_margin_bottom = 6
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = Palette.PINK
+	fill.set_corner_radius_all(10)
+	fill.content_margin_top = 6
+	fill.content_margin_bottom = 6
+	_theme.set_stylebox("slider", "HSlider", track)
+	_theme.set_stylebox("grabber_area", "HSlider", fill)
+	_theme.set_stylebox("grabber_area_highlight", "HSlider", fill)
 
 
 func _button(text: String, action: Callable) -> Button:
@@ -275,6 +290,7 @@ func _show_levels() -> void:
 
 func _show_menu() -> void:
 	_levels_panel.visible = false
+	_settings_panel.visible = false
 	_menu.visible = true
 	(_menu.get_child(0) as Button).grab_focus()
 
@@ -285,6 +301,8 @@ func _toggle_fullscreen() -> void:
 
 
 func _update_fullscreen_label() -> void:
+	if _fullscreen_button == null:
+		return
 	_fullscreen_button.text = "Fullscreen: %s" % ("On" if Settings.fullscreen else "Off")
 
 
@@ -294,8 +312,88 @@ func _start(index: int) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_cancel") and _levels_panel.visible:
+	if event.is_action_pressed("ui_cancel") and (_levels_panel.visible or _settings_panel.visible):
 		_show_menu()
+
+
+# --- settings page ------------------------------------------------------------------
+
+func _build_settings(root: Control) -> void:
+	_settings_panel = VBoxContainer.new()
+	_settings_panel.position = Vector2(84, 270)
+	_settings_panel.add_theme_constant_override("separation", 10)
+	_settings_panel.visible = false
+	root.add_child(_settings_panel)
+
+	_settings_panel.add_child(_setting_button(func() -> String:
+		return "Camera: %s" % ("follows the track" if Settings.camera_follow else "fixed isometric"),
+		func() -> void: Settings.set_value("camera_follow", not Settings.camera_follow)))
+	_settings_panel.add_child(_setting_button(func() -> String:
+		return "Zoom: %s" % Settings.ZOOM_NAMES[Settings.zoom],
+		func() -> void: Settings.set_value("zoom", (Settings.zoom + 1) % Settings.ZOOMS.size())))
+	_settings_panel.add_child(_slider("Music", Settings.music_volume, func(v: float) -> void:
+		Settings.set_value("music_volume", v)))
+	_settings_panel.add_child(_slider("Effects", Settings.sfx_volume, func(v: float) -> void:
+		Settings.set_value("sfx_volume", v)))
+	_settings_panel.add_child(_setting_button(func() -> String:
+		return "Graphics: %s" % ("high" if Settings.graphics_high else "fast"),
+		func() -> void: Settings.set_value("graphics_high", not Settings.graphics_high)))
+	_settings_panel.add_child(_setting_button(func() -> String:
+		return "Fullscreen: %s" % ("on" if Settings.fullscreen else "off"),
+		func() -> void: Settings.toggle_fullscreen()))
+	var reset := _button("Reset best times and unlocks", func() -> void: pass)
+	reset.pressed.connect(func() -> void:
+		if _reset_armed:
+			_scores.reset()
+			reset.text = "Progress reset"
+			_reset_armed = false
+		else:
+			_reset_armed = true
+			reset.text = "Sure? Press again to reset")
+	reset.add_theme_font_size_override("font_size", 28)
+	_settings_panel.add_child(reset)
+	_settings_panel.add_child(_button("Back", _show_menu))
+
+
+## A button whose label comes from `label` and refreshes after `action`.
+func _setting_button(label: Callable, action: Callable) -> Button:
+	var b := _button(label.call(), func() -> void: pass)
+	b.custom_minimum_size = Vector2(620, 0)
+	b.add_theme_font_size_override("font_size", 30)
+	b.pressed.connect(func() -> void:
+		action.call()
+		b.text = label.call()
+		_update_fullscreen_label())
+	return b
+
+
+func _slider(title: String, value: float, on_change: Callable) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 18)
+	var l := Label.new()
+	l.text = title
+	l.custom_minimum_size = Vector2(150, 0)
+	l.add_theme_font_size_override("font_size", 30)
+	l.add_theme_color_override("font_color", Palette.INK)
+	l.add_theme_color_override("font_outline_color", Color.WHITE)
+	l.add_theme_constant_override("outline_size", 8)
+	row.add_child(l)
+	var s := HSlider.new()
+	s.min_value = 0.0
+	s.max_value = 1.0
+	s.step = 0.05
+	s.value = value
+	s.custom_minimum_size = Vector2(450, 40)
+	s.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	s.value_changed.connect(on_change)
+	row.add_child(s)
+	return row
+
+
+func _show_settings() -> void:
+	_menu.visible = false
+	_settings_panel.visible = true
+	(_settings_panel.get_child(0) as Button).grab_focus()
 
 
 func _play_music() -> void:
@@ -306,5 +404,6 @@ func _play_music() -> void:
 	var p := AudioStreamPlayer.new()
 	p.stream = stream
 	p.volume_db = -9.0
+	p.bus = "Music"
 	p.autoplay = true
 	add_child(p)

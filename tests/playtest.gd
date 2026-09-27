@@ -60,6 +60,8 @@ var failed := false
 
 
 func _initialize() -> void:
+	# The input checks below assume the fixed isometric camera.
+	root.get_node("Settings").camera_follow = false
 	main = load("res://scenes/main.tscn").instantiate()
 	main.save_scores = false
 	main.auto_advance = false

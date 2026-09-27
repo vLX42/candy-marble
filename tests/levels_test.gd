@@ -17,6 +17,7 @@ var wait := 0.0
 var was_alive := true
 var results: Array[String] = []
 var failed := false
+var chute_frames := 0
 
 
 func _initialize() -> void:
@@ -66,6 +67,12 @@ func _process(delta: float) -> bool:
 		_release()
 		return false
 	_steer(ball)
+	if "--chute" in OS.get_cmdline_user_args():
+		for c in main.world.get_children():
+			if c is Chute:
+				var l: Vector3 = c.to_local(ball.global_position)
+				if absf(l.z) < 3.0 and absf(l.x) < 2.0 and l.y > 0.2 and l.y < 2.8:
+					chute_frames += 1
 	if "--verbose" in OS.get_cmdline_user_args() and int(level_t * 120) % 1200 == 0:
 		print("  t=%.0f pos=%s wp=%d" % [level_t, ball.global_position.snapped(Vector3.ONE * 0.1), wp])
 	return false
@@ -184,6 +191,8 @@ func _report(ok: bool) -> void:
 	var lvl: LevelBase = main.level
 	var line := "%s level %d %-16s bot %.1f s (par %.0f), falls %d" % [
 		"PASS" if ok else "FAIL", main.level_index + 1, lvl.title, level_t, lvl.time_limit, main.falls]
+	if "--chute" in OS.get_cmdline_user_args():
+		line += "  | frames riding a chute: %d" % chute_frames
 	if main.rival:
 		line += "  | rival %s" % ("%.1f s" % main.rival_time if main.rival_time > 0 else "beaten, was at waypoint %d/%d" % [main.rival._wp, main.rival._route.size()])
 	if ok and level_t > lvl.time_limit:

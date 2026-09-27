@@ -232,6 +232,111 @@ def checkpoint():
     return Piece(rows(h), rows(o), route=[(0, 2.5), (1, 2.5)], name="checkpoint")
 
 
+# --- one-off pieces for the level 1 descent ---------------------------------------------
+
+def slope_down(tiers=1, W=4):
+    """Gentle icing slope down `tiers` over W-1 tiles."""
+    h = lane(W, str(tiers), str(tiers + 1))
+    for x in range(1, W):
+        for z in range(1, 5):
+            h[z][x] = "w"
+    o = grid(W)
+    o[0][2], o[5][1] = "l", "g"
+    return Piece(rows(h), rows(o), route=[(0, 2.5), (W - 1, 2.5)], entry=tiers, exit=0, name="slope_down")
+
+
+def slalom():
+    """Zig-zag between pillow blocks."""
+    W = 10
+    h, o = lane(W), grid(W)
+    for x, zs in [(2, (1, 2)), (5, (3, 4)), (8, (1, 2))]:
+        for z in zs:
+            h[z][x] = "1"
+        o[zs[0]][x] = "l"
+    return Piece(rows(h), rows(o),
+                 route=[(0, 2.5), (1.5, 3.5), (2.5, 3.5), (3.8, 2.5), (5, 1.5), (6.2, 2.5), (8, 3.5), (9, 2.5)],
+                 name="slalom")
+
+
+def stairs(steps=2):
+    """Candy staircase: short flats with a one-tier drop after each."""
+    W = 2 * steps + 2
+    h = lane(W)
+    for x in range(W):
+        t = steps - min(x // 2, steps)
+        h[0][x] = h[5][x] = str(t + 1)
+        for z in range(1, 5):
+            h[z][x] = str(t)
+    o = grid(W)
+    o[0][1], o[5][3] = "t", "b"
+    return Piece(rows(h), rows(o), route=[(0, 2.5), (W - 1, 2.5)], entry=steps, exit=0, name="stairs")
+
+
+def funnel():
+    """Lane squeezes to two tiles with a booster pair in the middle."""
+    W = 7
+    h, o = lane(W), grid(W)
+    for x in range(1, 6):
+        h[1][x] = h[4][x] = "1"
+    o[2][3] = o[3][3] = ">"
+    o[1][2], o[4][4] = "%", "g"
+    return Piece(rows(h), rows(o), route=[(0, 2.5), (3, 2.5), (6, 2.5)], name="funnel")
+
+
+def chute_drop():
+    """Candy chute slide 4 tiers (2 units) down over a void."""
+    W = 8
+    h, o = grid(W), grid(W)
+    for x in (0, 1):
+        h[0][x] = h[5][x] = "5"
+        for z in range(1, 5):
+            h[z][x] = "4"
+    h[1][1] = h[4][1] = "5"          # squeeze towards the chute mouth
+    for x in (6, 7):
+        h[0][x] = h[5][x] = "1"
+        for z in range(1, 5):
+            h[z][x] = "0"
+    o[0][0], o[5][7] = "t", "l"
+    return Piece(rows(h), rows(o), entry=4, exit=0,
+                 extras=[{"type": "chute", "tile": (3.5, 2.5), "yaw": 90.0, "y_tier": 0}],
+                 route=[(0, 2.5), (1.2, 2.5), (6.2, 2.5), (7, 2.5)], name="chute")
+
+
+def leap(tiers=1):
+    """Booster run off an edge, fly a one-tile gap down onto a lower level."""
+    W = 11
+    h, o = grid(W), grid(W)
+    for x in range(4):
+        h[0][x] = h[5][x] = str(tiers + 1)
+        for z in range(1, 5):
+            h[z][x] = str(tiers)
+    for x in range(5, W):
+        h[0][x] = h[5][x] = "1"
+        for z in range(1, 5):
+            h[z][x] = "0"
+    for x in range(W - 1, W):
+        for z in range(6):
+            h[z][x] = "1"
+    h[1][W - 1] = h[2][W - 1] = h[3][W - 1] = h[4][W - 1] = "0"
+    o[2][1] = o[3][1] = ">"
+    o[0][7], o[5][8] = "%", "t"
+    return Piece(rows(h), rows(o), entry=tiers, exit=0,
+                 route=[(0, 2.5), (1, 2.5), (3.5, 2.5), (7, 2.5), (10, 2.5)], name="leap")
+
+
+def split():
+    """The lane splits round a candy mound: wavy left lane, boosted right lane."""
+    W = 10
+    h, o = lane(W), grid(W)
+    for x in range(2, 8):
+        for z in (2, 3):
+            h[z][x] = "2"
+        o[1][x] = "W"
+    o[2][3], o[3][6], o[2][5] = "%", "t", "b"
+    o[4][3] = o[4][6] = ">"
+    return Piece(rows(h), rows(o), route=[(0, 2.5), (1.5, 4), (8.5, 4), (9, 2.5)], name="split")
+
+
 # --- levels -------------------------------------------------------------------------
 
 def build(num, title, desc, par, tier, plan, race=False):
@@ -248,12 +353,11 @@ T = lambda d, bank=False: ("turn", d, "bank") if bank else ("turn", d)  # noqa: 
 
 
 def main():
-    build(1, "Sugar Lane", "A long, friendly tour with rails everywhere: waves, hills, bumpers, a loop, a river, one jump.", 155, 3, [
-        start(), straight(4), waves(6), T(+1), hills(), straight(4), bumpers(), T(-1), checkpoint(),
-        sweepers(1), straight(4), loop(), straight(3), T(+1), river(), ramp_down(), straight(4), T(-1),
-        checkpoint(), waves(8), kicker(), straight(3), T(+1), spinners(), bumpers(), drop(), T(-1),
-        checkpoint(), hills(), straight(4), river(10), T(+1), waves(6), straight(3), loop(), T(-1),
-        checkpoint(), bumpers(), sweepers(1), hills(), T(+1), river(), kicker(), waves(6), straight(3), finish(),
+    build(1, "Sugar Lane", "A descent from the top of the candy hills to the bottom, every stretch different: slope, slalom, stairs, a funnel, the candy chute, a split path, a leap down, a loop and a river.", 105, 8, [
+        start(), straight(3), slope_down(1), T(+1), slalom(), stairs(2), T(-1), checkpoint(), waves(6),
+        sweepers(1), T(+1), chute_drop(), funnel(), checkpoint(), bumpers(), T(-1), split(), table(), hills(),
+        T(+1), checkpoint(), leap(1), bridge(8, sweep=False), spinners(), loop(), T(-1), river(), kicker(),
+        drop(), finish(),
     ])
     build(2, "Gumdrop Pinball", "RACE vs the licorice ball. Bumper tables, slingshots, speed-bank corners and loops, down a long pinball run.", 130, 5, [
         start(), ramp_down(), table(), T(+1, True), bumpers(), checkpoint(), sweepers(2), loop(),
