@@ -46,6 +46,17 @@ var race := false
 var tier_colors: Array[Color] = [
 	Palette.MINT, Palette.LILAC, Color("#BFE3F7"), Color("#F9C6D3"), Color("#FFE7B3"),
 ]
+## Shown on the level card in quests.
+var description := ""
+var ramp_color := Palette.LEMON
+var wall_color := Color("#5A3426")
+## Multiplies every monster's speed (custom levels).
+var monster_speed := 1.0
+## Colour for every monster that has no own tint (alpha 0 = model colours).
+var monster_tint := Color(0, 0, 0, 0)
+## Race levels: rival cruise speed multiplier and colour.
+var rival_speed := 1.0
+var rival_tint := Color(0, 0, 0, 0)
 
 # Filled by build().
 var cols := 0
@@ -237,7 +248,7 @@ func in_hole(x: float, z: float) -> bool:
 func cell_color(i: int, j: int, x: float, z: float) -> Color:
 	var c: Color
 	if is_ramp(i, j):
-		c = Palette.LEMON
+		c = ramp_color
 	else:
 		c = tier_colors[posmod(tier_of(i, j), tier_colors.size())]
 	var f := feature(x, z)

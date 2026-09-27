@@ -80,3 +80,50 @@ static func torus(inner: float, outer: float) -> TorusMesh:
 	t.inner_radius = inner
 	t.outer_radius = outer
 	return t
+
+
+## Recolours a model: its main colour (the biggest coloured surface) becomes
+## `color` and the other coloured parts shift hue by the same amount, so
+## stripes and spikes keep their contrast. Whites, cream and ink eyes stay.
+static func tint(node: Node, color: Color) -> void:
+	if color.a <= 0.0:
+		return
+	var slots := []  # [MeshInstance3D, surface, material, size]
+	for mi: MeshInstance3D in node.find_children("*", "MeshInstance3D", true, false):
+		if mi.mesh == null:
+			continue
+		for s in mi.mesh.get_surface_count():
+			var m := mi.get_active_material(s) as BaseMaterial3D
+			if m == null:
+				continue
+			var arr := mi.mesh.surface_get_arrays(s)
+			var size: int = (arr[Mesh.ARRAY_VERTEX] as PackedVector3Array).size() if arr.size() > 0 else 0
+			slots.append([mi, s, m, size])
+	if slots.is_empty():
+		return
+	var primary: Array = []
+	for slot in slots:
+		var c: Color = slot[2].albedo_color
+		if c.s > 0.2 and c.v > 0.12 and (primary.is_empty() or slot[3] > primary[3]):
+			primary = slot
+	if primary.is_empty():
+		primary = slots[0]
+	var base: Color = primary[2].albedo_color
+	var dh := color.h - base.h
+	for slot in slots:
+		var m: BaseMaterial3D = slot[2]
+		var c := m.albedo_color
+		var nc := c
+		if m == primary[2]:
+			nc = Color(color.r, color.g, color.b, c.a)
+		elif c.s > 0.25 and c.v > 0.3:
+			nc = Color.from_hsv(fposmod(c.h + dh, 1.0), c.s, c.v, c.a)
+		else:
+			continue
+		var d := m.duplicate() as BaseMaterial3D
+		d.albedo_color = nc
+		var mi: MeshInstance3D = slot[0]
+		if mi.material_override == m:
+			mi.material_override = d
+		else:
+			mi.set_surface_override_material(slot[1], d)

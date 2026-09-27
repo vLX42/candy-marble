@@ -45,10 +45,19 @@ const CAMERA_FOLLOW := 5.0
 const CAMERA_TURN := 1.6
 const NEXT_LEVEL_DELAY := 3.0
 ## Entity dictionary keys that are not node properties.
-const META_KEYS := ["type", "pos", "yaw", "ground_tile", "y"]
+const META_KEYS := ["type", "pos", "yaw", "ground_tile", "y", "tint"]
+## Speed knobs per monster type: [property, true = bigger is faster].
+const SPEED_KEYS := {
+	"enemy": ["period", false], "stomper": ["period", false], "hopper": ["period", false],
+	"ghost": ["speed", true], "windmill": ["spin", true],
+}
 
 ## Set by the title screen before switching to this scene (-1 = use first_level).
 static var requested_level := -1
+## Custom quest to play instead of the built-in levels (null = campaign).
+static var quest: Quest = null
+## Test play from the level editor: Esc goes back to the editor, no scores.
+static var test_mode := false
 
 @export var first_level := 0
 ## Off for tests: stay on the level after reaching the goal.
@@ -85,6 +94,9 @@ var _sun: DirectionalLight3D
 
 func _ready() -> void:
 	add_to_group("game")
+	if test_mode:
+		save_scores = false
+		auto_advance = false
 	scores = Scores.new(save_scores)
 	_setup_input()
 	_setup_environment()
@@ -138,8 +150,12 @@ func play_music(track: String) -> void:
 func start_level(index: int) -> void:
 	level_index = index
 	play_music(LEVEL_MUSIC[index % LEVEL_MUSIC.size()])
-	var data: LevelBase = LEVELS[index].new()
+	var data: LevelBase = quest.make_level(index) if quest else LEVELS[index].new()
 	load_level(data)
+
+
+func level_count() -> int:
+	return quest.levels.size() if quest else LEVELS.size()
 
 
 ## Loads any LevelBase (tests use this for their own maps).
@@ -177,7 +193,9 @@ func load_level(data: LevelBase) -> void:
 		rival = SCENES.rival.instantiate()
 		rival.level = level
 		rival.position = ground(level.spawn + Vector2(0, LevelBase.TILE)) + Vector3.UP * 0.6
+		rival.cruise *= level.rival_speed
 		world.add_child(rival)
+		Palette.tint(rival, level.rival_tint)
 	for e in level.entities:
 		var node := _place(e)
 		if node is Goal:
@@ -192,24 +210,40 @@ func load_level(data: LevelBase) -> void:
 	var intro := "%s\nPar %.0f s.  Roll to the hole!" % [level.title, level.time_limit]
 	if level.race:
 		intro = "%s\nRace the licorice ball to the hole!" % level.title
+	if level.description != "":
+		var d := level.description.replace("\n", " ")
+		intro = "%s\n%s" % [level.title, d if d.length() <= 90 else d.substr(0, 87) + "..."]
 	show_message(intro, 3.0)
 
 
 func _place(e: Dictionary) -> Node3D:
+	return MainGame.spawn_entity(e, level, world)
+
+
+## Instances one level entity under `parent` (the editor uses this too).
+static func spawn_entity(e: Dictionary, lvl: LevelBase, parent: Node3D) -> Node3D:
 	var node: Node3D = SCENES[e.type].instantiate()
-	node.position = ground(e.pos)
+	node.position = Vector3(e.pos.x, lvl.height(e.pos.x, e.pos.y), e.pos.y)
 	if e.has("ground_tile"):
 		var gt: Vector2i = e.ground_tile
-		node.position.y = level.surface(gt.x, gt.y, (gt.x + 0.5) * LevelBase.TILE, (gt.y + 0.5) * LevelBase.TILE)
+		node.position.y = lvl.surface(gt.x, gt.y, (gt.x + 0.5) * LevelBase.TILE, (gt.y + 0.5) * LevelBase.TILE)
 	if e.has("y"):
 		node.position.y = e.y
 	if e.type == "goal":
-		node.position.y = level.height(e.pos.x + LevelBase.HOLE_RADIUS + 0.05, e.pos.y)
+		node.position.y = lvl.height(e.pos.x + LevelBase.HOLE_RADIUS + 0.05, e.pos.y)
 	node.rotation_degrees.y = e.get("yaw", 0.0)
 	for key: String in e:
 		if key not in META_KEYS:
 			node.set(key, e[key])
-	world.add_child(node)
+	if SPEED_KEYS.has(e.type) and not is_equal_approx(lvl.monster_speed, 1.0):
+		var k: Array = SPEED_KEYS[e.type]
+		var v: float = node.get(k[0])
+		node.set(k[0], v * lvl.monster_speed if k[1] else v / maxf(lvl.monster_speed, 0.05))
+	parent.add_child(node)
+	if SPEED_KEYS.has(e.type):
+		Palette.tint(node, e.get("tint", lvl.monster_tint))
+	elif e.has("tint"):
+		Palette.tint(node, e.tint)
 	return node
 
 
@@ -218,7 +252,13 @@ func ground(p: Vector2) -> Vector3:
 
 
 func _score_key() -> String:
+	if quest:
+		return "quest:%s:%d:%s" % [quest.id, level_index, level.title]
 	return "level:" + level.title
+
+
+func _run_key() -> String:
+	return "quest_run:" + quest.id if quest else "run"
 
 
 # --- Loop -------------------------------------------------------------------
@@ -248,7 +288,15 @@ func _process(delta: float) -> void:
 		camera.v_offset = 0.0
 
 	if Input.is_action_just_pressed("ui_cancel"):
-		get_tree().change_scene_to_file("res://scenes/title.tscn")
+		if test_mode:
+			test_mode = false
+			quest = null
+			get_tree().change_scene_to_file("res://scenes/editor.tscn")
+		else:
+			if quest:
+				TitleScreen.open_page = "quests"
+			quest = null
+			get_tree().change_scene_to_file("res://scenes/title.tscn")
 		return
 	if Input.is_action_just_pressed("restart"):
 		if game_complete:
@@ -355,11 +403,12 @@ func _on_goal() -> void:
 		sfx.play("pop")
 		hud.show_results({title = "2nd place", time = level_time,
 			info = "The licorice ball won by %.2f s" % (level_time - rival_time),
-			hint = "R  race again      Esc  menu"})
+			hint = "R  race again      Esc  %s" % ("editor" if test_mode else "menu")})
 		return
 	if rival and not race_lost:
 		rival.finished = true
-	scores.unlock(level_index + 2)
+	if quest == null:
+		scores.unlock(level_index + 2)
 	sfx.play("goal")
 	burst(ball.global_position + Vector3.UP * 0.8, [Palette.LEMON, Palette.PINK, Palette.MINT, Palette.LILAC, Palette.SKY], 60, 7.0)
 	var rank := scores.submit(_score_key(), level_time)
@@ -373,15 +422,19 @@ func _on_goal() -> void:
 		board_title = "BEST TIMES", board = scores.top(_score_key()), highlight = rank,
 		hint = "Next level coming up...      R  retry" if auto_advance else "R  retry      Esc  menu",
 	}
+	if test_mode:
+		res.hint = "R  retry      Esc  back to the editor"
+		hud.show_results(res)
+		return
 	var idx := level_index
-	if idx == LEVELS.size() - 1:
+	if idx == level_count() - 1:
 		game_complete = true
 		play_music(FINISH_MUSIC)
-		var run_rank := scores.submit("run", total_time)
-		res.title = "All %d levels done!" % LEVELS.size()
+		var run_rank := scores.submit(_run_key(), total_time)
+		res.title = "%s complete!" % quest.name if quest else "All %d levels done!" % LEVELS.size()
 		res.info = "Whole run %.2f s   %d falls%s" % [total_time, falls, "   NEW RECORD!" if run_rank == 0 else ""]
 		res.board_title = "BEST RUNS"
-		res.board = scores.top("run")
+		res.board = scores.top(_run_key())
 		res.highlight = run_rank
 		res.hint = "R  play again      Esc  menu"
 		hud.show_results(res)

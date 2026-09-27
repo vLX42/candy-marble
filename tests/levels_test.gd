@@ -25,11 +25,26 @@ func _initialize() -> void:
 	main.auto_advance = false
 
 	main.save_scores = false
+	var count: int = main.LEVELS.size()
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--level="):
 			levels = [int(arg.get_slice("=", 1)) - 1]
+		# Play the built-in levels after a round trip through the editor's JSON
+		# format (what "Remix" in the editor does).
+		if arg == "--remix":
+			var q := Quest.create("Remix test")
+			q.levels.clear()
+			for script: GDScript in main.LEVELS:
+				q.levels.append(CustomLevel.dict_from_level(script.new()))
+			q = Quest.from_share_code(q.share_code())
+			main.get_script().set("quest", q)
+		# Play a quest file: -- --quest=path/to/file.candyquest
+		if arg.begins_with("--quest="):
+			var q := Quest.load_file(arg.get_slice("=", 1))
+			main.get_script().set("quest", q)
+			count = q.levels.size()
 	if levels.is_empty():
-		for i in main.LEVELS.size():
+		for i in count:
 			levels.append(i)
 	main.first_level = levels[0]
 	root.add_child(main)

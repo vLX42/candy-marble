@@ -12,6 +12,8 @@ const TerrainShader := preload("res://scripts/terrain.gdshader")
 const CloudScene := preload("res://models/cloud.glb")
 
 var level: LevelBase
+## Only build these tiles (the editor rebuilds the map in chunks). Empty = all.
+var region := Rect2i()
 var _st: SurfaceTool
 var _faces := PackedVector3Array()
 var _drips: Array[Transform3D] = []
@@ -19,19 +21,22 @@ var _cloud_spots: Array[Vector3] = []
 var _rng := RandomNumberGenerator.new()
 
 
-func _init(level_data: LevelBase) -> void:
+func _init(level_data: LevelBase, only: Rect2i = Rect2i()) -> void:
 	level = level_data
+	region = only
 
 
 func _ready() -> void:
-	_rng.seed = hash(level.title)
+	_rng.seed = hash(level.title) + (hash(region.position) if region.has_area() else 0)
 	_st = SurfaceTool.new()
 	_st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for j in level.rows:
 		for i in level.cols:
-			if level.is_tile_ground(i, j):
+			if level.is_tile_ground(i, j) and (not region.has_area() or region.has_point(Vector2i(i, j))):
 				_build_tile(i, j)
 
+	if _faces.is_empty():
+		return
 	var mat := ShaderMaterial.new()
 	mat.shader = TerrainShader
 	_st.index()
@@ -160,9 +165,9 @@ func _edge(i: int, j: int, pa: Vector3, pb: Vector3, n: Vector3, nx: float, nz: 
 			return
 	var a2 := Vector3(pa.x, WALL_BOTTOM, pa.z)
 	var b2 := Vector3(pb.x, WALL_BOTTOM, pb.z)
-	var top := CHOCOLATE.srgb_to_linear()
+	var top := level.wall_color.srgb_to_linear()
 	top.a = pillow
-	var bottom := CHOCOLATE.srgb_to_linear().darkened(0.3)
+	var bottom := level.wall_color.srgb_to_linear().darkened(0.3)
 	bottom.a = 0.0
 	var wn := (n + Vector3.UP * 0.2).normalized()
 	# Clockwise = front face in Godot.

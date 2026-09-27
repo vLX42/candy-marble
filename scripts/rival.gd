@@ -30,7 +30,7 @@ func _ready() -> void:
 	model_name = skin
 	super._ready()
 	add_to_group("rival")
-	max_speed = 6.9
+	max_speed = maxf(6.9, cruise + 2.0)
 	push_force = 15.0
 	for t in level.route:
 		_route.append(level.tile_center_f(t))

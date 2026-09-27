@@ -60,6 +60,45 @@ is a list of pieces in `tools/genlevels.py`:
 python3 tools/genlevels.py
 ```
 
+## Level editor and quests
+
+Title screen > **Level editor** (or Quests > Edit). Build levels in a live 3D
+preview that uses the same code as the game:
+
+- **Ground:** paint heights 0-9 (painting past the edge grows the map), box
+  with optional walls, raise, lower, ramps (auto slope, or a jump when a ramp
+  runs into void), flood fill, erase, eyedropper.
+- **Surface:** waves, hills, trenches.
+- **Objects:** start, hole, checkpoint gates, bumpers, boosters, pinball stars
+  and targets, 8 kinds of candy decor.
+- **Monsters:** sweeper, stomper, hopper, ghost, windmill. Each one has its own
+  speed, timing and colour. The Level tab sets a speed and colour for all of
+  them at once.
+- **Toys:** slingshot, cannon and catapult (click to set the landing spot),
+  loop, chute, hoop, spinner, turner.
+- **Edit:** select, drag, turn, duplicate and delete. The Path tool draws the
+  rival's and the camera's route; without it the game finds one itself.
+- **Level tab:** name, description, par time (with a guess button), race mode,
+  rival speed and colour, colour themes, map size and crop.
+- Undo and redo, flat or 3D view, animated preview, test play with F5 (Esc
+  comes back). F1 lists every shortcut.
+
+A **quest** is a pack of levels with a name, an author and a description. The
+Quest tab adds, copies, orders and deletes levels, and can remix a built-in
+level. Quests are saved as JSON in `user://quests/<id>.candyquest`.
+
+Sharing and installing:
+
+- **Copy share code:** one line of text (`CANDYQUEST1:...`, gzipped JSON). Your
+  friend uses Quests > Paste code.
+- **Save as file:** a `.candyquest` file. Your friend drops it on the game
+  window, picks it with Quests > Open file, or copies it into the quest folder.
+
+Shared files are data only: every field is checked and clamped
+(`CustomLevel.sanitize`) and no code is ever loaded. The sample quest
+`quests/sweet_starter.json` (built by `tools/make_sample_quest.py`) is installed
+on first launch.
+
 ## Models (Blender)
 
 All models are scripted, so they can be rebuilt and tweaked in code:
@@ -89,7 +128,11 @@ godot --headless --fixed-fps 120 -s tests/playtest.gd      # mechanics
 godot --headless --fixed-fps 120 -s tests/levels_test.gd   # bot plays every level
 godot --headless --fixed-fps 120 -s tests/race_test.gd     # race win / 2nd place outcomes
 godot --headless --fixed-fps 120 -s tests/hazards_test.gd  # stomper, hopper, ghost, windmill, catapult
+godot --headless --fixed-fps 120 -s tests/editor_test.gd   # editor tools, undo, quests, share codes, sanitising
+godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --remix   # built-in levels after a trip through the quest format
+godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/sweet_starter.json
 godot --always-on-top -s tests/shots.gd                   # screenshots to tests/shots/
+godot --always-on-top -s tests/editor_shots.gd            # editor and quest page screenshots
 godot --always-on-top -s tests/perf.gd -- --level=4       # fps, triangles, draw calls
 ```
 

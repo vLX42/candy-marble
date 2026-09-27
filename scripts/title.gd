@@ -1,3 +1,4 @@
+class_name TitleScreen
 extends Node3D
 ## Title screen: a little candy island where the peppermint and licorice balls
 ## chase each other round and round, plus the menu (play, level select with
@@ -6,6 +7,9 @@ extends Node3D
 const SkyShader := preload("res://scripts/sky.gdshader")
 const RivalScene := preload("res://scenes/rival.tscn")
 const MUSIC := "res://audio/Spun_Sugar_Waltz.mp3"
+
+## Page to open on arrival ("quests" when coming back from a quest or the editor).
+static var open_page := ""
 
 
 class DemoLevel extends LevelBase:
@@ -49,12 +53,18 @@ var _settings_panel: VBoxContainer
 var _reset_armed := false
 var _fullscreen_button: Button
 var _theme := Theme.new()
+var _quests: QuestBrowser
+var _front: Array[Control] = []
 
 
 func _ready() -> void:
+	Quest.install_samples()
 	_build_world()
 	_build_ui()
 	_play_music()
+	if open_page == "quests":
+		_show_quests()
+	open_page = ""
 
 
 # --- 3D ---------------------------------------------------------------------------
@@ -151,7 +161,7 @@ func _build_ui() -> void:
 	root.add_child(sub)
 
 	_menu = VBoxContainer.new()
-	_menu.position = Vector2(84, 400)
+	_menu.position = Vector2(84, 380)
 	_menu.add_theme_constant_override("separation", 14)
 	root.add_child(_menu)
 	var unlocked := mini(_scores.unlocked(), MainGame.LEVELS.size())
@@ -163,6 +173,8 @@ func _build_ui() -> void:
 	else:
 		_menu.add_child(play)
 	_menu.add_child(_button("Levels", _show_levels))
+	_menu.add_child(_button("Quests", _show_quests))
+	_menu.add_child(_button("Level editor", _open_editor))
 	_menu.add_child(_button("Settings", _show_settings))
 	_menu.add_child(_button("Quit", func() -> void: get_tree().quit()))
 	var runs: Array = _scores.top("run")
@@ -209,60 +221,18 @@ func _build_ui() -> void:
 	hint.offset_left = 84
 	hint.offset_top = -56
 	root.add_child(hint)
+	_front = [logo, sub, hint]
+
+	_quests = QuestBrowser.new()
+	_quests.visible = false
+	_quests.closed.connect(_show_menu)
+	root.add_child(_quests)
 
 	play.grab_focus()
 
 
 func _setup_theme() -> void:
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color("#FFF4E0")
-	normal.border_color = Palette.PINK
-	normal.set_border_width_all(5)
-	normal.set_corner_radius_all(26)
-	normal.content_margin_left = 28
-	normal.content_margin_right = 28
-	normal.content_margin_top = 10
-	normal.content_margin_bottom = 12
-	normal.shadow_color = Color(0.78, 0.13, 0.31, 0.25)
-	normal.shadow_size = 6
-	normal.shadow_offset = Vector2(0, 5)
-	var hover := normal.duplicate()
-	hover.bg_color = Palette.LEMON
-	hover.border_color = Palette.CORAL
-	var pressed := normal.duplicate()
-	pressed.bg_color = Palette.PINK
-	_theme.set_stylebox("normal", "Button", normal)
-	_theme.set_stylebox("hover", "Button", hover)
-	_theme.set_stylebox("focus", "Button", hover)
-	_theme.set_stylebox("pressed", "Button", pressed)
-	var disabled := normal.duplicate()
-	disabled.bg_color = Color("#E9E1EC")
-	disabled.border_color = Color("#CBBFD4")
-	_theme.set_stylebox("disabled", "Button", disabled)
-	_theme.set_color("font_disabled_color", "Button", Color("#8A7E90"))
-	_theme.set_color("font_color", "Button", Palette.INK)
-	_theme.set_color("font_hover_color", "Button", Palette.INK)
-	_theme.set_color("font_focus_color", "Button", Palette.INK)
-	_theme.set_color("font_pressed_color", "Button", Palette.INK)
-	_theme.set_font_size("font_size", "Button", 38)
-	_theme.set_font("font", "Button", CandyText.FONT_BOLD)
-	_theme.set_color("font_color", "Button", CandyText.CHOCOLATE)
-	_theme.set_color("font_hover_color", "Button", CandyText.CHOCOLATE)
-	_theme.set_color("font_focus_color", "Button", CandyText.CHOCOLATE)
-	_theme.set_color("font_pressed_color", "Button", CandyText.CHOCOLATE)
-	var track := StyleBoxFlat.new()
-	track.bg_color = Color(1, 1, 1, 0.75)
-	track.set_corner_radius_all(10)
-	track.content_margin_top = 6
-	track.content_margin_bottom = 6
-	var fill := StyleBoxFlat.new()
-	fill.bg_color = Palette.PINK
-	fill.set_corner_radius_all(10)
-	fill.content_margin_top = 6
-	fill.content_margin_bottom = 6
-	_theme.set_stylebox("slider", "HSlider", track)
-	_theme.set_stylebox("grabber_area", "HSlider", fill)
-	_theme.set_stylebox("grabber_area_highlight", "HSlider", fill)
+	_theme = CandyTheme.make(38)
 
 
 func _button(text: String, action: Callable) -> Button:
@@ -274,6 +244,22 @@ func _button(text: String, action: Callable) -> Button:
 	return b
 
 
+func _show_quests() -> void:
+	_menu.visible = false
+	for c in _front:
+		c.visible = false
+	_quests.visible = true
+	_quests.refresh()
+	_quests.focus_first()
+
+
+func _open_editor() -> void:
+	var installed := Quest.list_installed()
+	LevelEditor.session_quest = installed[0] if not installed.is_empty() else null
+	LevelEditor.session_level = 0
+	get_tree().change_scene_to_file("res://scenes/editor.tscn")
+
+
 func _show_levels() -> void:
 	_menu.visible = false
 	_levels_panel.visible = true
@@ -283,6 +269,9 @@ func _show_levels() -> void:
 func _show_menu() -> void:
 	_levels_panel.visible = false
 	_settings_panel.visible = false
+	_quests.visible = false
+	for c in _front:
+		c.visible = true
 	_menu.visible = true
 	(_menu.get_child(0) as Button).grab_focus()
 
@@ -299,6 +288,8 @@ func _update_fullscreen_label() -> void:
 
 
 func _start(index: int) -> void:
+	MainGame.quest = null
+	MainGame.test_mode = false
 	MainGame.requested_level = index
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
 
