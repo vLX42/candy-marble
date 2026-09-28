@@ -18,6 +18,9 @@ var was_alive := true
 var results: Array[String] = []
 var failed := false
 var chute_frames := 0
+var blocked := 0.0        # how long the way ahead has been unsafe
+var frame_dt := 0.0
+var top_speed := 8.0      # how fast the bot lets itself go (faster near ghosts)
 var cam_turn := 0.0
 var cam_last := 0.0
 var cam_off := 0.0        # most the marble drifted off screen centre (world units)
@@ -63,6 +66,7 @@ func _initialize() -> void:
 
 func _process(delta: float) -> bool:
 	level_t += delta
+	frame_dt = delta
 	var ball: Ball = main.ball
 	cam_turn += absf(angle_difference(main._cam_yaw, cam_last))
 	cam_last = main._cam_yaw
@@ -143,20 +147,33 @@ func _steer(ball: Ball) -> void:
 	var dir := to.normalized()
 	var vel := Vector2(ball.linear_velocity.x, ball.linear_velocity.z)
 	var last := wp == route.size() - 1
-	# Putt gently into the hole; elsewhere cruise.
-	var target_speed := clampf(to.length() * 1.2, 1.2, 4.0) if last else CRUISE
+	# Putt gently into the hole; elsewhere cruise, and sprint past ghosts
+	# (they're slow, a marble at full tilt outruns them).
+	top_speed = 8.0
+	for g in get_nodes_in_group("ghost"):
+		if _flat(g.global_position).distance_to(pos) < 9.0:
+			top_speed = 9.5
+	var target_speed := clampf(to.length() * 1.2, 1.2, 4.0) if last else (CRUISE if top_speed < 9.0 else 9.0)
 	var ctrl := dir * target_speed - vel
 	# Never brake on purpose (keeps booster speed for jumps), only steer.
 	var along := ctrl.dot(dir)
 	if along < 0.0 and not last:
 		ctrl -= dir * along
 	# Read the sweepers' rhythm: go if the next second is safe, else wait,
-	# else back off.
+	# else back off. Something that just hangs in the way (a ghost at home, a
+	# steelie on guard) never clears, so after a moment of waiting, try an
+	# angled line round it over solid ground.
 	if not _safe(pos, vel, dir):
-		if _safe(pos, vel, Vector2.ZERO):
+		blocked += frame_dt
+		var dodge := _dodge(pos, vel, dir) if blocked > 0.8 else Vector2.ZERO
+		if dodge != Vector2.ZERO:
+			ctrl = dodge * CRUISE - vel
+		elif _safe(pos, vel, Vector2.ZERO):
 			ctrl = -vel * 3.0
 		elif _safe(pos, vel, -dir):
 			ctrl = -dir * CRUISE
+	else:
+		blocked = 0.0
 	var strength := clampf(ctrl.length() / 1.5, 0.0, 1.0)
 	var world_in := Vector3(ctrl.x, 0.0, ctrl.y).normalized() * strength
 
@@ -169,6 +186,25 @@ func _steer(ball: Ball) -> void:
 	_press("left", -ix)
 	_press("down", iy)
 	_press("up", -iy)
+
+
+## A safe direction a little off `dir` whose next few units are solid, level
+## ground (no void, goo or drop), or zero if there's none.
+func _dodge(pos: Vector2, vel: Vector2, dir: Vector2) -> Vector2:
+	var lvl: LevelBase = main.level
+	var y := lvl.height(pos.x, pos.y)
+	for a: float in [35.0, -35.0, 70.0, -70.0]:
+		var d := dir.rotated(deg_to_rad(a))
+		var ok := true
+		for r: float in [1.0, 2.0, 3.0]:
+			var q := pos + d * r
+			var t := lvl.tile_at(q.x, q.y)
+			if not lvl.is_tile_ground(t.x, t.y) or lvl.obj_char(t.x, t.y) == "A" or absf(lvl.height(q.x, q.y) - y) > 0.6:
+				ok = false
+				break
+		if ok and _safe(pos, vel, d):
+			return d * (9.0 / CRUISE if top_speed > 9.0 else 1.0)
+	return Vector2.ZERO
 
 
 ## Simulates the ball for HORIZON seconds accelerating along `push`
@@ -184,6 +220,11 @@ func _safe(pos: Vector2, vel: Vector2, push: Vector2) -> bool:
 			near.append(e)
 	if near.is_empty():
 		return true
+	# Ghosts hunt: predict them flying at the ball, not on a straight line.
+	var chase := {}
+	for e in near:
+		if e is Ghost and e._resting <= 0.0:
+			chase[e] = _flat(e.global_position)
 	var p := pos
 	var v := vel
 	var t := 0.0
@@ -192,13 +233,23 @@ func _safe(pos: Vector2, vel: Vector2, push: Vector2) -> bool:
 		if push == Vector2.ZERO:
 			v = v.move_toward(Vector2.ZERO, ACCEL * STEP)
 		else:
-			v = (v + push * ACCEL * STEP).limit_length(8.0)
+			v = (v + push * ACCEL * STEP).limit_length(top_speed)
 		p += v * STEP
 		for e in near:
-			var threat: Variant = e.threat_at(t)
-			if threat == null:
-				continue
-			var ep := _flat(threat)
+			var ep: Vector2
+			if chase.has(e):
+				var g: Vector2 = chase[e]
+				var home := _flat(e._home)
+				var nxt := g.move_toward(p, e.speed * STEP)
+				if nxt.distance_to(home) <= e.leash:
+					g = nxt
+				chase[e] = g
+				ep = g
+			else:
+				var threat: Variant = e.threat_at(t)
+				if threat == null:
+					continue
+				ep = _flat(threat)
 			var reach: float = e.get("reach") if e.get("reach") != null else REACH
 			if absf(ep.x - p.x) < reach and absf(ep.y - p.y) < reach:
 				return false

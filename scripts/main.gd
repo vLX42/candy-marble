@@ -932,6 +932,25 @@ func on_switch(open_time: float) -> void:
 		show_message("Click!\nSomething opened.", 1.6)
 
 
+## A lever flipped its gates over.
+func on_toggle(at: Vector3) -> void:
+	sfx.play("coin", -6.0, 0.0)
+	cheer("CLICK-CLACK!", at + Vector3.UP * 1.5)
+
+
+## One more switch of a puzzle set is down.
+func on_puzzle_step(done: int, total: int, at: Vector3) -> void:
+	sfx.play("coin", -6.0, 0.0)
+	cheer("%d OF %d" % [done, total], at + Vector3.UP * 1.5)
+
+
+## A puzzle set popped back up (wrong order, or too slow).
+func on_puzzle_reset(why: String, at: Vector3) -> void:
+	sfx.play("bonk", -4.0, 0.0)
+	_shake = maxf(_shake, 0.1)
+	cheer(why, at + Vector3.UP * 1.5)
+
+
 ## A pinball drop-target bank at `at` was cleared: open the gates it guards.
 func bank_cleared(at: Vector3) -> void:
 	for g in get_tree().get_nodes_in_group("gate"):

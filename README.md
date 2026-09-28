@@ -45,24 +45,32 @@ menu.
 
 | # | Level | Par | What's in it |
 |---|---|---|---|
-| 1 | Practice Slopes | 120 s | The Practice Race: rolling striped hillsides with no rails, pyramids, a kicker, and a slope straight down the screen to the hole |
-| 2 | Steelie Steps | 130 s | The Beginner Race: a walled plateau of pillars with the black steelie, the long steep ramp, stairs, a pipe, zigzag ledges, the blue wave. Falls break you |
-| 3 | Muncher Walkways | 140 s | The Intermediate Race: walkways with no walls (the key is in a dead end), green munchers, acid slime, grated ramps, the spoon catapult, hump bridges |
-| 4 | Catwalk Derby | 85 s | The Aerial Race as a RACE: a banked half-pipe, catwalks over nothing, the chute |
-| 5 | Starlight Islands | 100 s | Islands in space: leaps and cannons. Easter egg behind the start! |
-| 6 | Stomper Works | 120 s | The hammers: stomper gates, the timed press gate, windmills, a sweeper bridge, a button bridge |
-| 7 | Sour Gorge | 130 s | The acid: planks over goo, slime blobs, beams over a sour lake, ghosts |
-| 8 | Pinball Pyramids | 110 s | Pyramids and bumpers, a real pinball table (clear the targets to get out), a mini table |
-| 9 | Silly Sundae | 110 s | The Silly Race: slopes roll you up, monsters squish, crossing beams, loops |
-| 10 | Ultimate Candy | 110 s | The Ultimate Race as the final RACE: dips, ice, steelies, stompers and slime at once |
-| 11 | Beginner Race | 120 s | The Beginner Race map, top to bottom: block plateau, the long ramp, cones, the steelie's ledge, the hourglass, the chute, walkways round a pillar, the wave, the GOAL pad |
-| 12 | Silly Race | 100 s | The Silly Race map, section by section: the walled summit funnelling out between cones, the cone ridge S-bends with slots, the bird over the chasm, the monster pit with its terrace, the sloped X crossing, the sunken GOAL basin. Everything you know is wrong |
+| 1 | Practice Slopes | 95 s | The Practice Race: rolling striped hillsides with no rails, pyramids, a kicker, two switches before a gate, and a slope straight down the screen to the hole |
+| 2 | Steelie Steps | 100 s | The Beginner Race: press 1, 2, 3 round the pillar plateau while the steelie hunts you (3 sits on the obvious way back and resets the set), the long steep ramp, stairs, a pipe, zigzag ledges, the blue wave. Falls break you |
+| 3 | Muncher Walkways | 130 s | The Intermediate Race: walkways with no walls hiding two keys, green munchers, acid slime, grated ramps, the spoon catapult, hump bridges |
+| 4 | Catwalk Derby | 70 s | The Aerial Race as a RACE against a faster rival: a banked half-pipe, catwalks over nothing, the chute |
+| 5 | Starlight Islands | 95 s | Islands in space: leaps, cannons, and three lever bridges on two channels. Easter egg behind the start! |
+| 6 | Stomper Works | 110 s | The hammers: stomper gates, numbered switches between the press stompers (backwards), windmills, a sweeper bridge, a button bridge |
+| 7 | Sour Gorge | 100 s | The acid: planks over goo, slime blobs, ghost packs, beams over a sour lake, three switches in ten seconds on the goo flats |
+| 8 | Pinball Pyramids | 80 s | A steelie guarding the pyramids and bumpers, a real pinball table (clear the targets to get out), a mini table |
+| 9 | Silly Sundae | 115 s | The Silly Race: slopes roll you up, monsters squish, four numbered switches in the wrong corners, crossing beams, loops |
+| 10 | Ultimate Candy | 95 s | The Ultimate Race as the final RACE: dips, ice, hunting steelies, stompers and slime at once |
+| 11 | Beginner Race | 80 s | The Beginner Race map, top to bottom: block plateau, the long ramp, cones, the steelie's ledge, the hourglass, the chute, walkways round a pillar, the wave, the GOAL pad |
+| 12 | Silly Race | 65 s | The Silly Race map, section by section: the walled summit funnelling out between cones, the cone ridge S-bends with slots, the bird over the chasm, the monster pit with its terrace, the sloped X crossing, the sunken GOAL basin. Everything you know is wrong |
 
 Levels 1 to 10 are each built around one idea from the six Marble Madness
 races and no set piece appears twice; 11 and 12 recreate two of the original
-maps piece by piece. Most edges have no rails.
+maps piece by piece. Most edges have no rails, checkpoints are few, and gold
+takes a clean run: par sits about a fifth above the level bot's time.
 **Puzzles**: floor switches open candy gates (some only for a few seconds) or
-raise hidden bridges; pinball exits open when their drop target bank is down.
+raise hidden bridges. Several switches on one gate must all be pressed; dotted
+ones in order (a wrong one pops them all up); timed sets must be finished in
+time. Lilac levers flip their bridges over, and some bridges do the opposite
+of others. Pinball exits open when their drop target bank is down.
+**Enemies think**: the black steelie finds its way to you over the tiles,
+aims where you're going, never rolls off an edge itself, and near a drop it
+gets round to the inside and rams you towards it. Sour ghosts aim ahead of
+you and hunt in pairs, one cutting you off.
 **Pinball tables** are laid out like the real thing: plunger lane (skill
 shot), rollover lanes, jet bumpers, drop targets, spinner orbit, slingshots,
 flippers, and drains you can fall into.
@@ -238,6 +246,8 @@ godot --headless --fixed-fps 120 -s tests/sections_test.gd # sections, Road join
 godot --headless --fixed-fps 120 -s tests/madness_test.gd  # hard landings, goo, humps, tall steps
 godot --headless --fixed-fps 120 -s tests/flow_test.gd     # countdown, pause, ghost replay, test from here
 godot --headless --fixed-fps 120 -s tests/diagonal_test.gd # diagonal ramp tiles
+godot --headless --fixed-fps 120 -s tests/puzzle_test.gd   # switch sets, order, timed combos, levers, the steelie's brain
+godot -s tests/shots.gd -- --windowed --puzzles           # screenshots at every switch in the campaign
 godot --headless -s tools/check_seams.gd -- --level=1          # ramp tiles that don't meet their neighbours
 godot --headless --fixed-fps 120 -s tests/original_test.gd # pipe, ice, slime, steelie, GOAL pad, silly, arcade clock
 godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/marble_madness.json

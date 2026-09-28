@@ -4,6 +4,9 @@ extends AnimatableBody3D
 ## pressed (or its pinball target bank is cleared). With `bridge` it works the
 ## other way round: a plank hidden below that rises to fill a gap.
 ## `open_time` > 0 closes it again after that many seconds.
+## `invert` = 1: it starts open (a bridge starts up) and shuts when its channel
+## fires. Pair it with a normal gate on the same channel and a toggle lever to
+## make two bridges that take turns.
 
 @export var channel := "a"
 ## Footprint in tiles: x along the gate's local x, y along its local z.
@@ -11,8 +14,12 @@ extends AnimatableBody3D
 @export var height := 1.3
 @export var open_time := 0.0
 @export var bridge := false
+@export var invert := 0
 
+## Whether the way is physically open (a bridge is up / a barrier is down).
 var is_open := false
+## Whether its channel is on (differs from is_open for inverted gates).
+var _active := false
 var _base_y := 0.0
 var _close_left := 0.0
 var _shape: CollisionShape3D
@@ -63,13 +70,15 @@ func _ready() -> void:
 		Palette.add_mesh(self, Palette.box(Vector3(w - 0.1 if size.x >= size.y else 0.45, 0.2, d - 0.1 if size.x < size.y else 0.45)),
 			Palette.CREAM, Vector3(0, h + 0.05, 0))
 	_lamp = Palette.add_mesh(self, Palette.sphere(0.22), Palette.RASPBERRY, Vector3(0, (h if not bridge else 0.0) + 0.35, 0))
+	if invert:
+		_set_open(true, true)
 
 
 func _process(delta: float) -> void:
 	if _close_left > 0.0:
 		_close_left -= delta
 		if _close_left <= 0.0:
-			_set_open(false)
+			_set_active(false)
 
 
 ## Called by switches and target banks.
@@ -78,11 +87,32 @@ func trigger(duration: float) -> void:
 		_close_left = duration
 	elif open_time > 0.0:
 		_close_left = open_time
-	_set_open(true)
+	_set_active(true)
 
 
-func _set_open(on: bool) -> void:
+## Called by toggle levers: switch the channel over.
+func flip() -> void:
+	_close_left = 0.0
+	_set_active(not _active)
+
+
+func _set_active(on: bool) -> void:
+	_active = on
+	_set_open(on != bool(invert))
+
+
+func _set_open(on: bool, instant: bool = false) -> void:
 	if on == is_open:
+		return
+	if instant:
+		is_open = on
+		if bridge:
+			position.y = _base_y if on else _base_y - 6.0
+			visible = on
+			_shape.disabled = not on
+		else:
+			position.y = _base_y - (height + 0.2) if on else _base_y
+		(_lamp.material_override as StandardMaterial3D).albedo_color = Palette.MINT if on else Palette.RASPBERRY
 		return
 	is_open = on
 	var up := _base_y

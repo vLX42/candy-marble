@@ -212,9 +212,11 @@ def diag_finish(drop=2):
 
 # --- 2. Beginner Race ----------------------------------------------------------------------
 
-def pillar_field(W=16, w=8):
+def pillar_field(W=16, w=8, seq=False):
     """A walled plateau of candy pillars to weave through, with the black
-    steelie waiting in the corner."""
+    steelie on the hunt. With `seq`, the exit is locked until three numbered
+    switches are pressed 1, 2, 3: one in each far corner, and number 3 right
+    on the obvious way through (roll over it first and it does nothing)."""
     H, zoff = wide(w)
     spots = [(3, 1), (3, 2), (6, 6), (6, 7), (9, 1), (10, 1), (12, 5), (12, 6), (5, 8), (13, 8), (8, 4), (9, 7), (4, 5)]
 
@@ -225,9 +227,24 @@ def pillar_field(W=16, w=8):
                 z += 2
             h[z][x] = "1"
         o[1][1], o[H - 2][W - 3] = "l", "t"
-    extras = [{"type": "steelie", "tile": (W - 3, 1), "sense": 9.0, "leash": 14.0, "speed": 3.8}]
-    return arena(W, H, zoff, paint, "pillar_field", extras=extras,
-                 route=[(0, zoff + 2.5), (2, zoff + 2.5), (7, zoff + 1.5), (11, zoff + 3), (W - 1, zoff + 2.5)])
+    if not seq:
+        extras = [{"type": "steelie", "tile": (W - 3, 1), "sense": 9.0, "leash": 14.0, "speed": 3.8}]
+        return arena(W, H, zoff, paint, "pillar_field", extras=extras,
+                     route=[(0, zoff + 2.5), (2, zoff + 2.5), (7, zoff + 1.5), (11, zoff + 3), (W - 1, zoff + 2.5)])
+    ch = channel("pillars")
+    mid = zoff + 2.5
+    extras = [
+        {"type": "steelie", "tile": (7, 2), "sense": 11.0, "leash": 16.0, "speed": 4.4},
+        {"type": "switch", "tile": (W - 2, 2), "channel": ch, "order": 1},
+        {"type": "switch", "tile": (2, H - 3), "channel": ch, "order": 2},
+        {"type": "switch", "tile": (W - 5, mid - 0.5), "channel": ch, "order": 3},
+        {"type": "gate", "tile": (W - 1, mid), "yaw": 0.0, "channel": ch, "size": (1, 4)},
+    ]
+    # Back from 1 along row 3, not the middle: the middle rolls over 3 and
+    # resets the set (that's the trap).
+    route = [(0, mid), (7, mid), (W - 3, mid - 1), (W - 2, 2), (W - 3, mid - 1.5), (3, mid - 1.5), (2, H - 3), (3, mid),
+             (W - 5, mid - 0.5), (W - 2, mid), (W - 1, mid)]
+    return arena(W, H, zoff, paint, "pillar_field", extras=extras, route=route)
 
 
 def pipe_hop(gap=6, speed=6.0):
@@ -261,7 +278,7 @@ def wave_slide(n=8, dt=2, w=6):
 
 # --- 3. Intermediate Race ---------------------------------------------------------------------
 
-def walkway_maze(cols=5, rows_=4, seed=1, treats="%g"):
+def walkway_maze(cols=5, rows_=4, seed=1, treats="%g", keys=1):
     """A maze of raised walkways over nothing: the walls are the drop. The key
     (a switch) sits in the dead end farthest from the way out."""
     import random
@@ -341,19 +358,30 @@ def walkway_maze(cols=5, rows_=4, seed=1, treats="%g"):
     start, goal = (0, r_in), (cols - 1, r_out)
     path = bfs(start, goal)
     on_path = set(path)
-    best, best_d = None, -1
+    ends = []
     for c in range(cols):
         for r in range(rows_):
             if len(links(c, r)) == 1 and (c, r) not in on_path:
-                d = len(bfs(goal, (c, r)))
-                if d > best_d:
-                    best, best_d = (c, r), d
+                ends.append((len(bfs(goal, (c, r))), (c, r)))
+    # The keys hide in the dead ends furthest off the way out; the exit gate
+    # needs all of them (switches on one channel make a set).
+    ends.sort(reverse=True)
+    found = [e[1] for e in ends[:keys]]
     extras = []
-    if best:
+    if found:
         ch = channel("maze")
-        extras.append({"type": "switch", "tile": (4.5 + 3 * best[0], 1.5 + 3 * best[1]), "channel": ch})
+        for k in found:
+            extras.append({"type": "switch", "tile": (4.5 + 3 * k[0], 1.5 + 3 * k[1]), "channel": ch})
         extras.append({"type": "gate", "tile": (3 + 3 * cols, 1.5 + 3 * r_out), "yaw": 0.0, "channel": ch, "size": (1, 2)})
-        path = bfs(start, best) + bfs(best, goal)[1:]
+        # Visit the keys nearest first.
+        todo = list(found)
+        at, path = start, [start]
+        while todo:
+            todo.sort(key=lambda k: len(bfs(at, k)))
+            leg = bfs(at, todo.pop(0))
+            path += leg[1:]
+            at = leg[-1]
+        path += bfs(at, goal)[1:]
     mid = zoff + 2.5
     route = [(0, mid), (1.5, mid), (1.5, 1.5 + 3 * r_in)]
     route += [(4.5 + 3 * c, 1.5 + 3 * r) for (c, r) in path]
@@ -435,9 +463,11 @@ def island(W=8, decor="", name="island"):
 
 # --- 6. the works -----------------------------------------------------------------------------
 
-def big_press(timed=9.0):
+def big_press(timed=9.0, seq=False):
     """The bakery press: a 3x3 grid of stompers in a rolling wave; the gate at
-    the far end only stays open for a few seconds after the button."""
+    the far end only stays open for a few seconds after the button. With
+    `seq` the gate wants three numbered switches between the stompers instead,
+    numbered backwards: 1 by the far wall, 3 by the door you came in."""
     W, H, zoff = 13, 10, 2
     extras = []
     for i, x in enumerate((3.5, 6.5, 9.5)):
@@ -447,6 +477,15 @@ def big_press(timed=9.0):
     def paint(h, o):
         fill(h, 1, 1, W - 2, H - 2, 0)
         o[1][1], o[H - 2][W - 2] = "l", "t"
+    if seq:
+        ch = channel("press")
+        spots = [(11, 7), (5, 1.5), (2, 7)]
+        for k, t in enumerate(spots):
+            extras.append({"type": "switch", "tile": t, "channel": ch, "order": k + 1})
+        extras.append({"type": "gate", "tile": (W - 1, zoff + 2.5), "yaw": 0.0, "channel": ch, "size": (1, 4)})
+        return arena(W, H, zoff, paint, "big_press", extras=extras,
+                     route=[(0, zoff + 2.5), (2, 3.5), (5, 3.5), (8, 5.5), (11, 7), (8, 5.5), (5, 3.5), (5, 1.5),
+                            (5, 3.5), (2, 5.5), (2, 7), (2, 5.5), (5, 5.5), (8, 3.5), (11, 4.5), (W - 1, zoff + 2.5)])
     if timed:
         ch = channel("press")
         extras.append({"type": "switch", "tile": (1.5, zoff + 2.5), "channel": ch, "open_time": timed})
@@ -548,8 +587,10 @@ def goo_beams(W=12):
 
 # --- 8. the pinball peaks ----------------------------------------------------------------------
 
-def pyramid_field(W=16, w=8):
-    """Candy pyramids and pop bumpers on an open field, stars down the middle."""
+def pyramid_field(W=16, w=8, steelie=False):
+    """Candy pyramids and pop bumpers on an open field, stars down the middle.
+    With `steelie`, the black steelie guards the far half: it bumps you into
+    the pyramids and bumpers and off the open sides."""
     H, zoff = wide(w)
 
     def paint(h, o):
@@ -561,7 +602,8 @@ def pyramid_field(W=16, w=8):
             o[z][x] = "B"
         for x in (6, 7, 8):
             o[zoff + 2][x] = "@"
-    return arena(W, H, zoff, paint, "pyramid_field",
+    extras = [{"type": "steelie", "tile": (W - 4, H - 3), "sense": 10.0, "leash": 12.0, "speed": 4.2}] if steelie else []
+    return arena(W, H, zoff, paint, "pyramid_field", extras=extras,
                  route=[(0, zoff + 2.5), (2, zoff + 2.5), (6, zoff + 2), (10, zoff + 3), (W - 1, zoff + 2.5)])
 
 
@@ -923,6 +965,69 @@ def goal_pit(W=12, w=8):
                   route=[(0, zoff + 2.5), (3, zoff + 2.5), (W - 4, zoff + 2.5)], name="goal_pit")
 
 
+
+# --- puzzles ---------------------------------------------------------------------------------
+
+def switch_yard(W=14, w=10, spots=(), order=True, open_time=0.0, sweepers=(), goo=(), name="switch_yard"):
+    """A walled yard with switches at `spots` (tile coords inside the yard) and
+    the exit gate on the far wall. `order`: numbered, press them 1, 2, 3...;
+    `open_time`: all of them within that many seconds. `sweepers`: columns
+    with a sweeper running across the yard. `goo`: tiles of sour goo."""
+    H, zoff = wide(w)
+    mid = zoff + 2.5
+    ch = channel("yard")
+
+    def paint(h, o):
+        fill(h, 1, 1, W - 2, H - 2, 0)
+        for (x, z) in goo:
+            o[z][x] = "A"
+        o[1][1], o[H - 2][W - 2] = "%", "g"
+    extras = []
+    for k, t in enumerate(spots):
+        e = {"type": "switch", "tile": t, "channel": ch}
+        if order:
+            e["order"] = k + 1
+        if open_time:
+            e["open_time"] = open_time
+        extras.append(e)
+    extras.append({"type": "gate", "tile": (W - 1, mid), "yaw": 0.0, "channel": ch, "size": (1, 4)})
+    for k, x in enumerate(sweepers):
+        extras.append({"type": "enemy", "tile": (x, 1), "travel_tiles": (0, H - 3), "period": 3.6 + 0.5 * k,
+                       "phase": 0.5 * k})
+    route = [(0, mid), (2, mid)] + [tuple(t) for t in spots] + [(W - 2, mid), (W - 1, mid)]
+    return arena(W, H, zoff, paint, name, extras=extras, route=route)
+
+
+def lever_bridges():
+    """Three gaps and three candy bridges on two channels, worked by levers
+    in side bays off the track (roll straight along the middle and you miss
+    them). Pink lever P raises bridge A and drops bridge C; the lever on the
+    first island (Q) works bridge B; the lever on the second island is P
+    again, which brings C back up but drops A behind you."""
+    W, H, zoff = 26, 10, 2
+    lo, hi = zoff + 1, zoff + 4
+    h, o = gridh(W, H), gridh(W, H)
+    for x0, x1 in [(0, 4), (7, 11), (14, 18), (21, 25)]:
+        fill(h, x0, lo, x1, hi, 0)
+    # Bays for the levers, off the side of each ledge.
+    for x, z in [(2, lo - 1), (9, hi + 1), (16, lo - 1)]:
+        fill(h, x - 1, z, x + 1, z, 0)
+    p, q = channel("lever"), channel("lever")
+    mid = zoff + 2.5
+    extras = [
+        {"type": "switch", "tile": (2, lo - 1), "channel": p, "toggle": 1},
+        {"type": "switch", "tile": (9, hi + 1), "channel": q, "toggle": 1},
+        {"type": "switch", "tile": (16, lo - 1), "channel": p, "toggle": 1},
+        {"type": "gate", "tile": (5.5, mid), "channel": p, "size": (2, 4), "bridge": True, "y_tier": 0},
+        {"type": "gate", "tile": (12.5, mid), "channel": q, "size": (2, 4), "bridge": True, "y_tier": 0},
+        {"type": "gate", "tile": (19.5, mid), "channel": p, "size": (2, 4), "bridge": True, "y_tier": 0, "invert": 1},
+    ]
+    o[hi][1], o[lo][W - 2] = "l", "%"
+    route = [(0, mid), (2, lo), (2, lo - 1), (2, lo), (4, mid), (8, mid), (9, hi), (9, hi + 1), (9, hi), (11, mid),
+             (15, mid), (16, lo), (16, lo - 1), (16, lo), (18, mid), (W - 1, mid)]
+    return zpiece(h, o, zoff, extras=extras, route=route, name="lever_bridges")
+
+
 # --- writer -----------------------------------------------------------------------------
 
 def fmt(v):
@@ -1008,71 +1113,83 @@ def T(d, bank=False, w=4, rails=True, cone=False):
     return ("turn", d, {"bank": bank, "w": w, "rails": rails, "cone": cone})
 
 
+# Gold par per level and rival speeds for the races.
+# About 1.2x the level bot's time (it never brakes and never gets unlucky), so
+# gold takes a clean run. Bot times on 28 Sep 2026, after the puzzles went in:
+# 77, 82, 107, 59, 76, 90, 83, 63, 93, 77, 64, 53 s.
+PAR = {1: 95, 2: 100, 3: 130, 4: 70, 5: 95, 6: 110, 7: 100, 8: 80, 9: 115, 10: 95, 11: 80, 12: 65}
+RIVAL = {4: 1.1, 10: 1.06}
+
+
 # --- the ten levels ------------------------------------------------------------------------
 
 def level_1():
     """Practice Race: rolling striped hillsides, no rails, pyramids, a kicker,
-    and at the end the ground tips straight down the screen to the hole."""
+    two switches before a gate, and at the end the ground tips straight down
+    the screen to the hole."""
     c = run(Course(tier=8), [
         g.start(), g.straight(2), hillside(3, 8), T(+1), g.straight(3), pyramid_pinch(12), hillside(2, 6),
         T(-1), g.kicker(), g.straight(2), g.checkpoint(), ledge(6, 4, "l%"), T(+1), g.split(), g.slalom(),
+        switch_yard(12, 8, spots=[(4, 1), (8, 8)], order=False, name="twin_switches"),
         g.straight(2), T(+1), g.straight(4), hillside(2, 8), g.straight(3), T(-1), g.waves(6), g.hills(6),
         g.checkpoint(), ledge(8, 4, "g%"), T(-1), g.straight(3), g.river(8), g.straight(2), T(+1), g.straight(2),
         diag_finish(2),
     ])
-    write(1, c, "Practice Slopes", "Rolling candy hillsides with no rails. Learn to lean, then roll down to the hole.",
-          120, "meadow")
+    write(1, c, "Practice Slopes", "Rolling candy hillsides with no rails. Learn to lean, find both switches.",
+          PAR[1], "meadow")
 
 
 def level_2():
-    """Beginner Race: a walled plateau of pillars with the black steelie, the
-    long steep ramp, a staircase, a pipe, narrow zigzag ledges, the blue wave."""
+    """Beginner Race: the steelie hunts you round the pillar plateau while you
+    press 1, 2, 3; then the long steep ramp, a staircase, a pipe, narrow
+    zigzag ledges, the blue wave."""
     c = run(Course(tier=8), [
-        g.start(), g.straight(2), g.drop(), pillar_field(16, 8), T(+1), g.straight(2), steep(6, 3, 4), ledge(4),
+        g.start(), g.straight(2), g.drop(), pillar_field(16, 8, seq=True), T(+1), g.straight(2), steep(6, 3, 4), ledge(4),
         g.checkpoint(), T(-1), g.stairs(1), pipe_hop(6), T(+1, w=2, rails=False), ledge(5, 2), T(-1, w=2, rails=False),
-        ledge(5, 2), T(+1, w=2, rails=False), step_down(1, 2), ledge(3, 2), T(-1), g.checkpoint(), g.straight(2),
+        ledge(5, 2), T(+1, w=2, rails=False), step_down(1, 2), ledge(3, 2), T(-1), g.straight(2),
         g.bridge(10, sweep=False), T(-1), g.straight(2), steep(4, 1, 4), ledge(4), T(+1, w=2, rails=False), ledge(4, 2),
         T(+1, w=2, rails=False), ledge(4, 2), T(-1, w=2, rails=False), ledge(3, 2), T(-1), g.checkpoint(),
         wave_slide(8, 1, 6), g.straight(2), g.finish(),
     ])
-    write(2, c, "Steelie Steps", "The black steelie hunts the plateau. Then the long ramp, the stairs and the ledges.",
-          130, "sky", step=1.0, break_drop=3)
+    write(2, c, "Steelie Steps", "Press 1, 2, 3 while the steelie hunts you. Then the long ramp and the ledges.",
+          PAR[2], "sky", step=1.0, break_drop=3)
 
 
 def level_3():
-    """Intermediate Race: raised walkways with no walls, green munchers, acid
-    slime, steep grated ramps, the spoon catapult and the green hump bridges."""
+    """Intermediate Race: raised walkways with no walls hiding two keys, green
+    munchers, acid slime, steep grated ramps, the spoon catapult and the green
+    hump bridges."""
     c = run(Course(tier=8), [
-        g.start(), g.straight(2), steep(1, 2, 4, True), walkway_maze(5, 4, 33), g.checkpoint(), T(+1),
-        g.hopper_lane(), steep(1, 2, 4, True), slime_ledge(12), T(-1), g.checkpoint(), g.catapult_launch(),
+        g.start(), g.straight(2), steep(1, 2, 4, True), walkway_maze(5, 4, 33, keys=2), g.checkpoint(), T(+1),
+        g.hopper_lane(), steep(1, 2, 4, True), slime_ledge(12), T(-1), g.catapult_launch(),
         hump_bridge(9), T(+1), hump_bridge(9), T(-1), hump_bridge(9), g.checkpoint(), T(-1), g.straight(3),
         steep(1, 2, 4, True), ledge(6, 2), T(+1), g.hopper_lane(), slime_ledge(10), T(+1), g.straight(3),
         steep(2, 1, 4, True), g.checkpoint(), hump_bridge(13), g.straight(2), g.finish(),
     ])
-    write(3, c, "Muncher Walkways", "Walkways with no walls, green munchers and acid slime. Ride the humps home.",
-          140, "caramel", monster_tint="#6fd13a")
+    write(3, c, "Muncher Walkways", "Two keys hide in the walkway maze. Then munchers, acid slime and the humps.",
+          PAR[3], "caramel", monster_tint="#6fd13a")
 
 
 def level_4():
     """Aerial Race: a banked half-pipe, catwalks over the void, the candy
-    chute, and the licorice rival racing you all the way."""
+    chute, and a faster licorice rival racing you all the way."""
     c = run(Course(tier=6), [
         g.start(), boost_strip(), halfpipe(12, 6), T(+1, True), ledge(6, 2), step_down(1, 2), T(-1, w=2, rails=False),
-        ledge(5, 2), T(+1, w=2, rails=False), step_down(1, 2), g.checkpoint(), g.straight(2), chute_drop(),
+        ledge(5, 2), T(+1, w=2, rails=False), step_down(1, 2), g.straight(2), chute_drop(),
         T(-1, True), boost_strip(), g.funnel(), g.straight(3), T(+1, True), halfpipe(10, 6), g.checkpoint(),
         T(+1, True), g.straight(3), ledge(6, 2), T(-1, w=2, rails=False), ledge(6, 2), T(+1, w=2, rails=False),
-        ledge(4, 2), T(-1), g.checkpoint(), boost_strip(), ledge(8, 4, "g%"), g.finish(),
+        ledge(4, 2), T(-1), boost_strip(), ledge(8, 4, "g%"), g.finish(),
     ])
     write(4, c, "Catwalk Derby", "Race the licorice ball: the half-pipe, catwalks over nothing, the chute.",
-          85, "licorice", race=True, rival_tint="#2b2438", rival_speed=1.05)
+          PAR[4], "licorice", race=True, rival_tint="#2b2438", rival_speed=RIVAL[4])
 
 
 def level_5():
-    """Islands in space: leaps, cannons, and a secret behind the start."""
+    """Islands in space: leaps, cannons, lever bridges, and a secret behind the start."""
     c = Course(tier=4)
     c.place(g.start())
     run(c, [g.straight(2), g.leap(1), island(8, "bh$r"), T(+1), g.cannon_hop(), island(10, "g%l"), g.leap(1),
-            T(-1), g.checkpoint(), g.straight(3), g.leap(1), island(8, "t%"), T(+1), ledge(6, 4, "lg"),
+            T(-1), g.checkpoint(), lever_bridges(), g.straight(2), g.leap(1), island(8, "t%"), T(+1), ledge(6, 4, "lg"),
             g.cannon_hop(), island(12, "%hh$"), g.checkpoint(), T(+1), g.straight(4), g.leap(1), island(8, "r$"),
             T(-1), g.straight(3), g.leap(1), ledge(4, 4)])
     fin = c._world(3, 2.5)
@@ -1098,71 +1215,78 @@ def level_5():
         {"type": "secret", "tile": (-10, 2.5)},
         {"type": "cannon", "tile": (-15, 2.5), "target_tile": fin, "hang": 3.4},
     ]
-    write(5, c, "Starlight Islands", "Islands floating in space: leap the gaps, ride the cannons. Look behind you!",
-          100, "space", extra_cells=cells, extra_extras=extras)
+    write(5, c, "Starlight Islands", "Leap the islands, ride the cannons, work out the lever bridges. Look behind you!",
+          PAR[5], "space", extra_cells=cells, extra_extras=extras)
 
 
 def level_6():
-    """The hammers of the Aerial Race as a candy factory: stompers, the big
-    press with its timed gate, windmills, fast sweepers, a button bridge."""
+    """The hammers of the Aerial Race as a candy factory: stompers, the press
+    with its numbered switches, windmills, fast sweepers, a button bridge."""
     c = run(Course(tier=5), [
-        g.start(), g.stomper_gate(), T(+1), big_press(9.0), g.checkpoint(), g.windmill_plaza(), T(-1),
-        g.sweepers(3, "all"), switch_gap(), T(+1), steep(2, 2, 4, True), g.checkpoint(), g.sweepers(2, True),
+        g.start(), g.stomper_gate(), T(+1), big_press(seq=True), g.checkpoint(), g.windmill_plaza(), T(-1),
+        g.sweepers(3, "all"), switch_gap(), T(+1), steep(2, 2, 4, True), g.sweepers(2, True),
         g.straight(2), T(+1), g.straight(3), g.bridge(10, sweep=True), g.checkpoint(), T(-1), g.windmill_plaza(),
-        g.straight(2), T(-1), g.stomper_gate(), g.checkpoint(), g.sweepers(3, "all"), g.straight(2), g.finish(),
+        g.straight(2), T(-1), g.stomper_gate(), g.sweepers(3, "all"), g.straight(2), g.finish(),
     ])
-    write(6, c, "Stomper Works", "The candy factory: stompers, the timed press gate, windmills, a button bridge.",
-          120, "bakery", monster_tint="#8cc9f0")
+    write(6, c, "Stomper Works", "Find the numbered switches between the stompers, backwards. Then windmills.",
+          PAR[6], "bakery", monster_tint="#8cc9f0")
 
 
 def level_7():
-    """The acid of the Ultimate Race: planks over goo, slime blobs on the
-    flats, beams over a sour lake, ghosts, a river."""
+    """The acid of the Ultimate Race: planks over goo, a timed switch combo on
+    the slime flats, beams over a sour lake, ghost packs, a river."""
     c = run(Course(tier=4), [
         g.start(), g.ramp_up(), goo_planks(0), g.straight(3), T(+1), slime_flats(16, 8), g.checkpoint(), goo_beams(12),
-        T(-1), g.ghost_garden(), g.straight(2), T(+1), g.checkpoint(), goo_beams(8), g.ramp_down(), g.straight(3),
-        T(+1), g.straight(3), g.ramp_up(), goo_planks(1), g.straight(3), T(-1), g.checkpoint(), slime_flats(14, 8),
+        T(-1), g.ghost_garden(), g.straight(2), T(+1), goo_beams(8), g.ramp_down(), g.straight(3),
+        T(+1), g.straight(3), g.ramp_up(), goo_planks(1), g.straight(3), T(-1), g.checkpoint(),
+        switch_yard(14, 10, spots=[(3, 1), (11, 10), (11, 1)], order=False, open_time=10.0,
+                    goo=[(6, 1), (7, 1), (8, 2), (4, 8), (4, 9), (7, 10), (8, 10)], name="goo_combo"),
         goo_beams(10), T(-1), g.ghost_garden(), g.ramp_down(), g.straight(3), g.finish(),
     ])
-    write(7, c, "Sour Gorge", "Sour goo everywhere: planks, slime blobs, beams over the lake, ghosts.",
-          130, "swamp", monster_tint="#b99bea")
+    write(7, c, "Sour Gorge", "Goo, slime and ghost packs. Hit three switches in ten seconds on the flats.",
+          PAR[7], "swamp", monster_tint="#b99bea")
 
 
 def level_8():
-    """Pyramids and bumpers, then a real pinball table: clear the targets to get out."""
+    """Pyramids, bumpers and a steelie on guard, then a real pinball table:
+    clear the targets to get out."""
     c = run(Course(tier=4), [
-        g.start(), pyramid_field(16, 8), T(+1, True), g.table(), g.checkpoint(), pinball_machine(), T(-1, True),
-        g.spinners(), g.stairs(2), g.straight(2), T(-1, True), g.bumpers(), g.checkpoint(), g.straight(2),
+        g.start(), pyramid_field(16, 8, steelie=True), T(+1, True), g.table(), g.checkpoint(), pinball_machine(), T(-1, True),
+        g.spinners(), g.stairs(2), g.straight(2), T(-1, True), g.bumpers(), g.straight(2),
         pyramid_field(14, 8), T(+1, True), g.straight(3), g.table(), g.checkpoint(), g.spinners(), g.straight(2),
         g.finish(),
     ])
-    write(8, c, "Pinball Pyramids", "Pyramids, pop bumpers, then a real pinball table. Down the targets to get out.",
-          110, "pinball")
+    write(8, c, "Pinball Pyramids", "A steelie guards the pyramids. Then a real pinball table: down the targets.",
+          PAR[8], "pinball")
 
 
 def level_9():
-    """Silly Race: everything you know is wrong. Slopes roll you up, monsters squish."""
+    """Silly Race: everything you know is wrong. Slopes roll you up, monsters
+    squish, and four numbered switches wait in the wrong order."""
     c = run(Course(tier=2), [
         g.start(), g.bumpers(), cross_bridges(14, 8), T(+1), g.loop(), g.sweepers(2), g.checkpoint(), T(-1),
-        g.ramp_up(), g.hills(6), T(+1), g.slalom(), g.checkpoint(), g.sweepers(3, "all"), g.straight(2), T(+1),
-        g.straight(3), cross_bridges(12, 8), g.checkpoint(), T(-1), g.ramp_up(), g.loop(), g.sweepers(2, True),
+        g.ramp_up(), g.hills(6), T(+1), g.slalom(), switch_yard(16, 10, spots=[(14, 10), (2, 1), (14, 1), (2, 10)],
+                                                        sweepers=(5, 10), name="silly_numbers"),
+        g.checkpoint(), g.sweepers(3, "all"), g.straight(2), T(+1),
+        g.straight(3), cross_bridges(12, 8), T(-1), g.ramp_up(), g.loop(), g.sweepers(2, True),
         T(-1), g.checkpoint(), g.hills(6), g.ramp_up(), g.straight(2), g.finish(),
     ])
-    write(9, c, "Silly Sundae", "Everything you know is wrong! Slopes roll you up and monsters go squish.",
-          110, "bubblegum", silly=True)
+    write(9, c, "Silly Sundae", "Everything you know is wrong! Four numbered switches, in the wrong places.",
+          PAR[9], "bubblegum", silly=True)
 
 
 def level_10():
-    """Ultimate Race: checker dips, ice, steelies, stompers, slime, all at once, racing the rival."""
+    """Ultimate Race: checker dips, ice, hunting steelies, stompers, slime, all
+    at once, racing a faster rival."""
     c = run(Course(tier=7), [
         g.start(), checker_dips(14, 8), T(+1), ice_lane(10), steelie_run(14, 6), g.checkpoint(), T(-1),
-        press_run(8), g.drop(), g.slope_down(2, 5), T(+1), slime_ledge(12), g.checkpoint(), g.sweepers(2, True),
+        press_run(8), g.drop(), g.slope_down(2, 5), T(+1), slime_ledge(12), g.sweepers(2, True),
         T(-1), g.ramp_up(), g.straight(3), T(-1), ice_lane(8), checker_dips(12, 8), g.checkpoint(), T(+1),
-        g.straight(3), steelie_run(12, 6), press_run(6), g.drop(), g.checkpoint(), T(+1), g.straight(3),
+        g.straight(3), steelie_run(12, 6), press_run(6), g.drop(), T(+1), g.straight(3),
         slime_ledge(10), g.ramp_up(), g.straight(3), g.finish(),
     ])
-    write(10, c, "Ultimate Candy", "The final race: dips, ice, steelies, stompers and slime, all at once.",
-          110, "summit", race=True, rival_tint="#2b2438", rival_speed=1.0)
+    write(10, c, "Ultimate Candy", "The final race: dips, ice, hunting steelies, stompers and slime, all at once.",
+          PAR[10], "summit", race=True, rival_tint="#2b2438", rival_speed=RIVAL[10])
 
 
 def level_11():
@@ -1176,7 +1300,7 @@ def level_11():
         pillar_walkways(14, 10), T(+1), g.straight(2), g.checkpoint(), wave_floor(12, 8), goal_pad(8),
     ])
     write(11, c, "Beginner Race", "The Beginner Race, top to bottom: the long ramp, the steelie, the chute, the wave.",
-          120, "beginner", step=1.0, break_drop=3)
+          PAR[11], "beginner", step=1.0, break_drop=3)
 
 
 def level_12():
@@ -1194,7 +1318,7 @@ def level_12():
         cross_ramps(), step_down(1, 4, 4), goal_pit(12, 8),
     ])
     write(12, c, "Silly Race", "The Silly Race. Everything you know is wrong: slopes roll you up, monsters squish.",
-          100, "lemonade", silly=True, step=1.0, monster_tint="#6fd13a")
+          PAR[12], "lemonade", silly=True, step=1.0, monster_tint="#6fd13a")
 
 
 LEVELS = [level_1, level_2, level_3, level_4, level_5, level_6, level_7, level_8, level_9, level_10, level_11, level_12]

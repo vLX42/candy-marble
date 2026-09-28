@@ -26,10 +26,24 @@ func _initialize() -> void:
 	if routes.is_empty():
 		for script: GDScript in main.LEVELS:
 			routes.append(script.new().route.size())
-	for li in routes.size():
-		var n: int = routes[li]
-		for wi in [0, n / 3, 2 * n / 3, n - 1]:
-			queue.append([li, wi])
+	# -- --puzzles: instead of four points along the route, the route point
+	# nearest each switch (built-in levels).
+	if "--puzzles" in OS.get_cmdline_user_args():
+		for li in main.LEVELS.size():
+			var lvl: LevelBase = main.LEVELS[li].new()
+			for e in lvl.extras:
+				if e.type != "switch":
+					continue
+				var best := 0
+				for wi in lvl.route.size():
+					if lvl.route[wi].distance_to(e.tile) < lvl.route[best].distance_to(e.tile):
+						best = wi
+				queue.append([li, best])
+	else:
+		for li in routes.size():
+			var n: int = routes[li]
+			for wi in [0, n / 3, 2 * n / 3, n - 1]:
+				queue.append([li, wi])
 	DirAccess.make_dir_recursive_absolute("res://tests/shots")
 
 

@@ -6,7 +6,7 @@ extends LevelBase
 func _init() -> void:
 	title = "Silly Race"
 	description = "The Silly Race. Everything you know is wrong: slopes roll you up, monsters squish."
-	time_limit = 100.0
+	time_limit = 65.0
 	step = 1.00
 	break_drop = 0
 	tier_colors = [Color("#FFF1A8"), Color("#FFE07A"), Color("#FFF6CC"), Color("#F6E27A"), Color("#FFEAB8")]

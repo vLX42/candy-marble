@@ -77,9 +77,9 @@ generator is not clamped but stays inside them.
 | `enemy` | `travel [x, y, z]` world units, `period` 0.4..20 (there and back), `phase` 0..1 | Sweeper block sliding back and forth. Sweepers in the object map become these |
 | `stomper` | `period` 0.8..12, `lift` 1..5, `phase` | Marshmallow press. Pass while it's up. `reach` 1.45 |
 | `hopper` | `travel`, `period`, `hops` 1..8, `hop_height` 0.4..4, `phase` | Gumdrop that hops along its travel; go under it mid-hop |
-| `ghost` | `speed` 0.5..8, `leash` 1..16, `sense` 2..20, `chase_time`, `rest_time` | Chases when it sees you, gets tired, drifts home |
+| `ghost` | `speed` 0.5..8, `leash` 1..16, `sense` 2..20, `chase_time`, `rest_time` | Chases when it sees you, aiming where you're going, gets tired, drifts home. Two chasing the same marble hunt as a pack: the one further back swings ahead to cut you off. They're slow (2.6): outrun them |
 | `windmill` | `spin` -4..4, `arm_length` 1.5..6 | Swats the marble away, doesn't pop it |
-| `steelie` | `speed` 1.5..9, `sense` 3..20, `leash` 3..30 | The black marble: rolls at you when you're in range, shoves you, returns home. Keep it off two-tile ledges unless you mean it |
+| `steelie` | `speed` 1.5..9, `sense` 3..20, `leash` 3..30 | The black marble plays for the fall. It pathfinds over the tiles (round corners, down ramps, never off an edge or into goo), aims where you're going, and near a drop circles to the inside and rams you towards it. It only hunts inside its territory: tiles within `leash` of home by path. Deadly on narrow ledges (`tests/puzzle_test.gd` has it knock a marble off an L-shaped two-tile track) |
 | `slime` | `travel`, `period` 1..20, `phase` | Acid blob patrolling; melts the marble |
 
 ### Launchers and rides
@@ -102,8 +102,8 @@ generator is not clamped but stays inside them.
 
 | Type | Parameters | Behaviour |
 |---|---|---|
-| `switch` | `channel`, `open_time` 0..60 | Floor button. Opens every gate on its channel, for good or for `open_time` seconds |
-| `gate` | `channel`, `open_time`, `height`, `y`, `size [w, h]` tiles, `bridge`, `yaw` | A candy gate. With `bridge = true` it is a plank that rises when the channel opens: `y` is the plank's world height (tier x step), and it needs a landing tile on the far side |
+| `switch` | `channel`, `open_time` 0..60, `order` 0..9, `toggle` 0/1 | Floor button. Alone on its channel it opens the channel's gates, for good or for `open_time` seconds. Several on one channel are a set: all must be pressed (they stay down and light up), then the gates open for good. `order` 1, 2, 3 (dots on the rim): a wrong one pops the whole set up. `open_time` on a set: each press only holds that long, a timed combo. `toggle = 1` (lilac cap) is a lever: every press flips its channel's gates |
+| `gate` | `channel`, `open_time`, `height`, `y`, `size [w, h]` tiles, `bridge`, `invert` 0/1, `yaw` | A candy gate. With `bridge = true` it is a plank that rises when the channel opens: `y` is the plank's world height (tier x step), and it needs a landing tile on the far side. `invert = 1` starts open (bridge up) and shuts when the channel fires: a normal and an inverted bridge on one lever take turns |
 | `secret` | | Easter egg star: a cheer when found (`tests/campaign_test.gd` rolls backwards off level 5's start to find one) |
 | `goalpad` | | The checkered GOAL pad. Finishing without a hole |
 
@@ -134,15 +134,15 @@ Set pieces (`tools/make_campaign.py`, each used in one level):
 
 | Level | Pieces |
 |---|---|
-| 1 Practice Slopes | hillside (striped rolling descent), pyramid_pinch, diag_finish (diagonal ramp band to the hole) |
-| 2 Steelie Steps | pillar_field, steep (long ramp), pipe_hop, wave_slide, step_down, ledge |
-| 3 Muncher Walkways | walkway_maze (walls are the drop, key in the far dead end), hump_bridge, slime_ledge |
+| 1 Practice Slopes | hillside (striped rolling descent), pyramid_pinch, switch_yard (two switches, any order), diag_finish (diagonal ramp band to the hole) |
+| 2 Steelie Steps | pillar_field `seq=True` (1-2-3 while the steelie hunts; 3 sits on the obvious way back), steep (long ramp), pipe_hop, wave_slide, step_down, ledge |
+| 3 Muncher Walkways | walkway_maze `keys=2` (walls are the drop, two keys in the far dead ends), hump_bridge, slime_ledge |
 | 4 Catwalk Derby | halfpipe (banked corridor), chute_drop, boost_strip |
-| 5 Starlight Islands | island, leaps, cannon_hop, the secret behind the start |
-| 6 Stomper Works | big_press (timed gate), switch_gap (button bridge) |
-| 7 Sour Gorge | goo_planks, slime_flats, goo_beams |
-| 8 Pinball Pyramids | pyramid_field, pinball_machine (locked exit), table |
-| 9 Silly Sundae | cross_bridges, loop |
+| 5 Starlight Islands | island, leaps, cannon_hop, lever_bridges (three bridges, two channels, levers in side bays), the secret behind the start |
+| 6 Stomper Works | big_press `seq=True` (numbered switches between the stompers, backwards), switch_gap (button bridge) |
+| 7 Sour Gorge | goo_planks, slime_flats, goo_beams, switch_yard with goo (three switches in ten seconds) |
+| 8 Pinball Pyramids | pyramid_field `steelie=True`, pinball_machine (locked exit), table |
+| 9 Silly Sundae | cross_bridges, loop, switch_yard (four numbered switches in the wrong corners, two sweepers) |
 | 10 Ultimate Candy | checker_dips, ice_lane, steelie_run, press_run |
 | 11 Beginner Race | block_plateau, cone_plateau, steelie_ledge, hourglass, pillar_walkways, wave_floor, goal_pad |
 | 12 Silly Race | summit_box, slot_ledge, bird_perch, terrace_room, cross_ramps (sloped X), goal_pit, turns with `cone = True` |
@@ -157,6 +157,19 @@ Turns: `T(d, bank, w, rails)`. `w = 2` is a narrow ledge corner, `rails =
 False` leaves it open, `bank = True` adds a speed bank. Two right turns make
 a U-turn 6 tiles over; wide pieces on parallel legs overlap, so add straights
 (the stitcher raises on overlap).
+
+Puzzle pieces: `switch_yard(W, w, spots, order, open_time, sweepers, goo)`
+is a walled yard with switches at `spots` and the exit gate on the far wall
+(numbered, any order or timed); `lever_bridges()` is three gaps on two lever
+channels. Put the bot's route through switches in the order a smart player
+would take, and keep it off switches it shouldn't press on the way (a route
+that rolls over switch 3 on the way back from 1 resets the set; that's the
+trap in level 2). Keep goo off the straight lines between the switches of a
+timed set, or the combo can't be done cleanly.
+
+Difficulty: gold par per level lives in `PAR` at the top of the level plans,
+about 1.2 x the bot's time; the race rivals' speeds in `RIVAL`. Checkpoints
+are sparse on purpose (two or three per level).
 
 Adding a level: a `level_N()` in `make_campaign.py`, the preload in
 `MainGame.LEVELS` (`scripts/main.gd`), a row in README's table. Tests that
@@ -182,14 +195,17 @@ godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests
 godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --remix   # built-ins after the quest format round trip
 godot --headless -s tools/check_seams.gd -- --level=N                 # ramp tiles that don't meet their neighbours
 godot -s tests/shots.gd -- --windowed                                 # screenshots to tests/shots/
+godot -s tests/shots.gd -- --windowed --puzzles                       # ...at every switch in the campaign
 godot --always-on-top -s tools/preview_quest.gd -- res://quests/x.json
 ```
 
 The bot steers along the route at cruise speed 6, never brakes, waits for
 sweepers and stompers, and gives up after 180 s ("stuck at tile (x, z),
-waypoint k/n" tells you where). It reports the time against par: keep the bot
-well under par, players are slower. `--cam` adds how far the marble drifts
-off the follow camera's centre (aim for under 3).
+waypoint k/n" tells you where). It predicts ghosts as hunters, sprints past
+them, and when something just hangs in its way for a moment it tries an
+angled line round it over solid ground. It reports the time against par.
+`--cam` adds how far the marble drifts off the follow camera's centre (aim
+for under 3).
 
 Things the bot taught us: a gate bridge needs a landing tile and route
 points on both sides; respawn checkpoints next to goo pools cost dozens of

@@ -4,6 +4,8 @@ extends Area3D
 ## but never strays further than `leash` from home. It tires after chasing for
 ## `chase_time` and drifts home for `rest_time`: that's your window to slip
 ## past. Touching it pops the ball.
+## It aims where you're going, and ghosts hunt as a pack: when another ghost
+## is already closer behind you, this one swings ahead to cut you off.
 
 @export var leash := 6.0
 @export var speed := 2.6
@@ -22,6 +24,7 @@ var _visual: Node3D
 
 func _ready() -> void:
 	add_to_group("enemy")
+	add_to_group("ghost")
 	_home = global_position + Vector3.UP * 0.9
 	global_position = _home
 	_t = randf() * TAU
@@ -47,12 +50,15 @@ func _physics_process(delta: float) -> void:
 		_resting -= delta
 	else:
 		var best := sense
+		var prey: Ball
 		for b in get_tree().get_nodes_in_group("ball"):
 			if b is Ball and b.alive and not b.rush:
 				var d: float = Vector2(b.global_position.x - _home.x, b.global_position.z - _home.z).length()
 				if d < best:
 					best = d
-					target = Vector3(b.global_position.x, _home.y, b.global_position.z)
+					prey = b
+		if prey:
+			target = _hunt_point(prey)
 		if target != _home:
 			_chasing += delta
 			if _chasing > chase_time:
@@ -73,6 +79,22 @@ func _physics_process(delta: float) -> void:
 	global_position.y = _home.y + sin(_t * 2.2) * 0.15
 	if _vel.length() > 0.2:
 		_visual.rotation.y = lerp_angle(_visual.rotation.y, atan2(_vel.x, _vel.z), 1.0 - exp(-6.0 * delta))
+
+
+## Where to fly: ahead of the prey, and further ahead if a pack mate is
+## already closer (so the two close in from both sides).
+func _hunt_point(prey: Ball) -> Vector3:
+	var p := Vector3(prey.global_position.x, _home.y, prey.global_position.z)
+	var v := Vector3(prey.linear_velocity.x, 0.0, prey.linear_velocity.z)
+	var gap := Vector2(p.x - global_position.x, p.z - global_position.z).length()
+	var lead := p + v * clampf(gap / maxf(speed, 0.5), 0.0, 0.8)
+	for g in get_tree().get_nodes_in_group("ghost"):
+		if g == self or not (g is Ghost) or g._resting > 0.0 or g._chasing <= 0.0:
+			continue
+		var theirs := Vector2(p.x - g.global_position.x, p.z - g.global_position.z).length()
+		if theirs < gap and v.length() > 0.5:
+			return lead + v.normalized() * 3.0
+	return lead
 
 
 func position_at(ahead: float) -> Vector3:
