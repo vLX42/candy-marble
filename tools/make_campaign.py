@@ -230,7 +230,7 @@ def pillar_field(W=16, w=8):
                  route=[(0, zoff + 2.5), (2, zoff + 2.5), (7, zoff + 1.5), (11, zoff + 3), (W - 1, zoff + 2.5)])
 
 
-def pipe_hop(gap=6):
+def pipe_hop(gap=6, speed=6.0):
     """A candy pipe sucks you in and spits you out across the void."""
     W = gap + 6
     h, o = gridh(W, 6), gridh(W, 6)
@@ -239,7 +239,7 @@ def pipe_hop(gap=6):
         for z in range(1, 5):
             h[z][x] = "0"
     o[0][1], o[5][W - 2] = "g", "l"
-    return Piece(rows(h), rows(o), extras=[{"type": "pipe", "tile": (1.5, 2.5), "target_tile": (W - 2, 2.5), "speed": 6.0}],
+    return Piece(rows(h), rows(o), extras=[{"type": "pipe", "tile": (1.5, 2.5), "target_tile": (W - 2, 2.5), "speed": speed}],
                  route=[(0, 2.5), (1.5, 2.5), (W - 2, 2.5), (W - 1, 2.5)], name="pipe_hop")
 
 
@@ -813,6 +813,55 @@ def cone_cross(W=14, w=8):
     return zpiece(h, o, zoff, route=[(0, zoff + 2.5), (W - 1, zoff + 2.5)], name="cone_cross")
 
 
+
+def start_plateau(W=12, w=8):
+    """The Silly Race's top: a plateau with a high wall along the back and
+    one side, open on the others, cones pinching the way out. The marble
+    starts here."""
+    H, zoff = wide(w)
+    h, o = gridh(W, H), gridh(W, H)
+    fill(h, 0, 1, W - 1, w, 0)
+    fill(h, 0, 0, W - 1, 0, 2)
+    fill(h, 0, 0, 0, w, 2)
+    o[zoff + 2][2] = "S"
+    for x in (W - 5, W - 2):
+        o[1][x] = "P"
+        o[w][x + 1] = "P"
+    o[2][W - 7], o[w - 1][3] = "%", "g"
+    return zpiece(h, o, zoff, route=[(2, zoff + 2.5), (6, zoff + 2.5), (W - 1, zoff + 2.5)], name="start_plateau")
+
+
+def slot_ledge(W=8):
+    """An open four-tile ledge with sunken slots cut into its edges."""
+    h, o = gridh(W, 6), gridh(W, 6)
+    fill(h, 0, 1, W - 1, 4, 0)
+    for x in range(1, W - 1, 2):
+        o[1 if x % 4 == 1 else 4][x] = "T"
+    return Piece(rows(h), rows(o), route=[(0, 2.5), (W - 1, 2.5)], name="slot_ledge")
+
+
+def terrace_room(W=16, w=10):
+    """A walled room with a raised terrace in the middle: the ramp up it
+    rolls you up (silly), the far side is a drop. Hoppers patrol the floor."""
+    H, zoff = wide(w)
+    cx = W // 2
+
+    def paint(h, o):
+        fill(h, 1, 1, W - 2, H - 2, 0)
+        fill(h, cx - 2, zoff + 1, cx + 2, zoff + 4, 1)
+        for z in range(zoff + 1, zoff + 5):
+            h[z][cx - 3] = "e"
+        o[1][2], o[H - 2][W - 3], o[1][W - 3], o[H - 2][2] = "%", "%", "h", "r"
+        o[zoff + 1][cx] = "$"
+    extras = [
+        {"type": "hopper", "tile": (3, 1), "travel_tiles": (0, w - 1), "period": 4.0, "hops": 3, "hop_height": 1.2},
+        {"type": "hopper", "tile": (W - 4, w), "travel_tiles": (0, -(w - 1)), "period": 3.6, "hops": 3, "hop_height": 1.2, "phase": 0.5},
+        {"type": "slime", "tile": (cx, 1), "travel_tiles": (4, 0), "period": 4.4},
+    ]
+    return arena(W, H, zoff, paint, "terrace_room", extras=extras,
+                 route=[(0, zoff + 2.5), (cx - 4, zoff + 2.5), (cx, zoff + 2.5), (cx + 3, zoff + 2.5), (W - 1, zoff + 2.5)])
+
+
 # --- writer -----------------------------------------------------------------------------
 
 def fmt(v):
@@ -894,8 +943,8 @@ def run(c, plan):
     return c
 
 
-def T(d, bank=False, w=4, rails=True):
-    return ("turn", d, {"bank": bank, "w": w, "rails": rails})
+def T(d, bank=False, w=4, rails=True, cone=False):
+    return ("turn", d, {"bank": bank, "w": w, "rails": rails, "cone": cone})
 
 
 # --- the ten levels ------------------------------------------------------------------------
@@ -1070,16 +1119,20 @@ def level_11():
 
 
 def level_12():
-    """The Silly Race, top to bottom: cones, crossing beams, the windmill,
-    the bonus field, more crossings, the GOAL pad. Everything you know is wrong."""
-    c = run(Course(tier=3), [
-        g.start(), cone_walk(12), T(+1), cross_bridges(12, 8), g.straight(2), T(-1), cone_cross(14, 8),
-        g.checkpoint(), T(+1), g.windmill_plaza(), g.ramp_up(), T(-1), bonus_field(16, 8), g.checkpoint(),
-        T(+1), g.sweepers(2), cone_cross(12, 8), T(-1), g.ramp_up(), cone_walk(9), g.checkpoint(), T(+1),
-        cross_bridges(14, 8), g.straight(2), goal_pad(8),
+    """The Silly Race, top to bottom: the walled start plateau with cone
+    pinches, open S-bend ledges with cones on the corners and sunken slots,
+    the pipe across the canyon, the walled room with the terrace and the
+    hoppers, then the crossings down to the GOAL pad. Everything you know is
+    wrong: slopes roll you up, drops are cliffs."""
+    c = run(Course(tier=7), [
+        start_plateau(12, 8), T(+1), cone_walk(12), step_down(1, 4, 4), g.checkpoint(), T(-1, w=2, rails=False),
+        ledge(5, 2), T(+1, w=2, rails=False), slot_ledge(8), step_down(1, 2), ledge(3, 2),
+        T(-1, w=2, rails=False), ledge(4, 2), T(+1), g.checkpoint(), pipe_hop(8, 10.0), T(-1), g.straight(2),
+        terrace_room(16, 10), g.checkpoint(), step_down(1, 4, 4), T(+1), cone_cross(14, 8), T(-1), g.ramp_up(),
+        cross_bridges(12, 8), g.checkpoint(), T(+1), g.sweepers(2), cone_cross(12, 8), g.straight(2), goal_pad(8),
     ])
     write(12, c, "Silly Race", "The Silly Race. Everything you know is wrong: slopes roll you up, monsters squish.",
-          110, "lemonade", silly=True)
+          120, "lemonade", silly=True, step=1.0)
 
 
 LEVELS = [level_1, level_2, level_3, level_4, level_5, level_6, level_7, level_8, level_9, level_10, level_11, level_12]

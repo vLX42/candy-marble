@@ -99,10 +99,11 @@ class Course:
         self.oz += f[1] * p.W
         self.tier += p.exit - p.entry
 
-    def turn(self, d, bank=False, w=4, rails=True):
+    def turn(self, d, bank=False, w=4, rails=True, cone=False):
         """d=+1 turns to the right-hand lateral, d=-1 to the left. `w` is the
         lane width (4 fills the strip, 2 is a narrow ledge centred in it);
-        without `rails` the corner is open to the void, Marble Madness style."""
+        without `rails` the corner is open to the void, Marble Madness style;
+        `cone` puts a candy cone on the outer corner tile."""
         lo = 1 + (4 - w) // 2
         hi = lo + w - 1
         hs = [["." for _ in range(6)] for _ in range(6)]
@@ -128,7 +129,11 @@ class Course:
         extras = []
         if bank:
             extras.append({"type": "redirect", "tile": (cx, mid), "yaw": 0.0 if d > 0 else 180.0, "strength": 8.0})
-        piece = Piece(["".join(r) for r in hs], extras=extras, route=route, name="turn")
+        os_ = [["." for _ in range(6)] for _ in range(6)]
+        if cone:
+            # A candy cone on the outer corner: cut the turn tight and you hit it.
+            os_[lo if d > 0 else hi][5 - lo] = "P"
+        piece = Piece(["".join(r) for r in hs], ["".join(r) for r in os_], extras=extras, route=route, name="turn")
         f, l = F[self.h], L[self.h]
         tier = self.tier
         self.place(piece)

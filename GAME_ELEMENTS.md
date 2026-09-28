@@ -144,7 +144,15 @@ Set pieces (`tools/make_campaign.py`, each used in one level):
 | 9 Silly Sundae | cross_bridges, loop |
 | 10 Ultimate Candy | checker_dips, ice_lane, steelie_run, press_run |
 | 11 Beginner Race | block_plateau, cone_plateau, steelie_ledge, hourglass, pillar_walkways, wave_floor, goal_pad |
-| 12 Silly Race | cone_walk, cone_cross, bonus_field |
+| 12 Silly Race | start_plateau, cone_walk, slot_ledge, terrace_room, cone_cross |
+
+Turns also take `cone = True` (a cone on the outer corner tile). Not in a
+silly level: silly physics pushes the marble UP every slope, so a cone next
+to a narrow ledge pulls it in and flings it off (the bot died there every
+time). Not possible in this engine: one path crossing *over* another. The
+ground is a height map with one height per tile, so crossings are level
+(they still read as an X on screen). Also untested: the race rival under
+silly physics.
 
 Turns: `T(d, bank, w, rails)`. `w = 2` is a narrow ledge corner, `rails =
 False` leaves it open, `bank = True` adds a speed bank. Two right turns make
