@@ -20,6 +20,11 @@ var failed := false
 var chute_frames := 0
 var cam_turn := 0.0
 var cam_last := 0.0
+var cam_off := 0.0        # most the marble drifted off screen centre (world units)
+var cam_flips := 0        # times the follow view picked a new direction
+var cam_view := INF
+var cam_calm := 0.0       # time since the marble last respawned or was carried (pipe, cannon)
+var cam_prev := Vector3.ZERO
 
 
 func _initialize() -> void:
@@ -61,6 +66,17 @@ func _process(delta: float) -> bool:
 	var ball: Ball = main.ball
 	cam_turn += absf(angle_difference(main._cam_yaw, cam_last))
 	cam_last = main._cam_yaw
+	cam_calm += delta
+	if not ball.alive or ball.global_position.distance_to(cam_prev) > 1.5 or not ball.visible:
+		cam_calm = 0.0
+	cam_prev = ball.global_position
+	if cam_calm > 1.0 and level_t > 1.0 and main._fly_left <= 0.0:
+		var local: Vector3 = main.camera.global_transform.affine_inverse() * ball.global_position
+		cam_off = maxf(cam_off, Vector2(local.x, local.y).length())
+	if main._cam_view != cam_view:
+		if cam_view != INF and main._cam_view != INF:
+			cam_flips += 1
+		cam_view = main._cam_view
 	if "--trace" in OS.get_cmdline_user_args() and int(level_t * 120) % 15 == 0 and ball.alive:
 		var q := ball.global_position / LevelBase.TILE
 		print("  trace t=%.2f tile=(%.1f, %.1f) y=%.2f wp=%d v=%s" % [level_t, q.x, q.z, ball.global_position.y, wp, ball.linear_velocity.snapped(Vector3.ONE * 0.1)])
@@ -228,7 +244,7 @@ func _report(ok: bool) -> void:
 	if "--chute" in OS.get_cmdline_user_args():
 		line += "  | frames riding a chute: %d" % chute_frames
 	if "--cam" in OS.get_cmdline_user_args():
-		line += "  | camera turned %.0f deg" % rad_to_deg(cam_turn)
+		line += "  | camera turned %.0f deg, %d flips, marble drift %.1f" % [rad_to_deg(cam_turn), cam_flips, cam_off]
 	if main.rival:
 		line += "  | rival %s" % ("%.1f s" % main.rival_time if main.rival_time > 0 else "beaten, was at waypoint %d/%d" % [main.rival._wp, main.rival._route.size()])
 	if ok and level_t > lvl.time_limit:
@@ -251,4 +267,7 @@ func _report(ok: bool) -> void:
 	level_t = 0.0
 	cam_turn = 0.0
 	cam_last = main._cam_yaw
+	cam_off = 0.0
+	cam_flips = 0
+	cam_view = INF
 	was_alive = true

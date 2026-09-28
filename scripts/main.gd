@@ -53,8 +53,9 @@ const SkyShader := preload("res://scripts/sky.gdshader")
 
 const CAMERA_ROTATION := Vector3(-35.264, 45.0, 0.0)  # true isometric
 const CAMERA_FOLLOW := 5.0
-## How fast the playfield turns to follow the track (follow camera setting).
-const CAMERA_TURN := 1.6
+## How fast the playfield turns to follow the track (follow camera setting):
+## a spring, so a turn eases in and out instead of lurching off.
+const CAMERA_TURN := 3.2
 ## Follow camera: how far ahead it reads the track, and how long the track must
 ## point a new way before the view turns.
 const CAMERA_LOOK := 8.0
@@ -137,6 +138,11 @@ var game_complete := false
 var hud: Hud
 var _shake := 0.0
 var _cam_yaw := deg_to_rad(45.0)
+var _cam_yaw_vel := 0.0
+## The smoothed point the camera looks at. The camera sits a fixed distance
+## back from it, so turning the view spins round the marble and never swings
+## it off the screen.
+var _cam_at := Vector3.ZERO
 var _env: Environment
 var _sun: DirectionalLight3D
 
@@ -266,8 +272,7 @@ func load_level(data: LevelBase) -> void:
 	_cam_hold = 0.0
 	_cam_cool = 0.0
 	_cam_yaw = _track_yaw() if Settings.camera_follow else deg_to_rad(45.0)
-	camera.rotation = Vector3(deg_to_rad(CAMERA_ROTATION.x), _cam_yaw, 0.0)
-	camera.global_position = _camera_target()
+	_snap_camera()
 	hud.set_level(level_index + 1, level.title, level.time_limit, level.race)
 	_update_best_label()
 	var intro := "%s\nPar %.0f s.  Roll to the %s!" % [level.title, level.time_limit, "hole" if level.hole else "goal"]
@@ -293,8 +298,7 @@ func load_level(data: LevelBase) -> void:
 	_flown = id
 	if _fly_left > 0.0:
 		_cam_yaw = deg_to_rad(45.0)
-		camera.rotation = Vector3(deg_to_rad(CAMERA_ROTATION.x), _cam_yaw, 0.0)
-		camera.global_position = _camera_target()
+		_snap_camera()
 		camera.size = Settings.camera_size() * 1.35
 	if _count_left > 0.0:
 		ball.input_lock = _count_left + _fly_left
@@ -399,20 +403,25 @@ func _process(delta: float) -> void:
 	var target_yaw := _track_yaw(delta) if Settings.camera_follow else deg_to_rad(45.0)
 	if _fly_left > 0.0:
 		target_yaw = deg_to_rad(45.0)
-	_cam_yaw = lerp_angle(_cam_yaw, target_yaw, 1.0 - exp(-CAMERA_TURN * delta))
+	# Critically damped spring towards the wanted view.
+	var dt := minf(delta, 0.05)
+	_cam_yaw_vel += (CAMERA_TURN * CAMERA_TURN * angle_difference(_cam_yaw, target_yaw) - 2.0 * CAMERA_TURN * _cam_yaw_vel) * dt
+	_cam_yaw = wrapf(_cam_yaw + _cam_yaw_vel * dt, -PI, PI)
 	camera.rotation = Vector3(deg_to_rad(CAMERA_ROTATION.x), _cam_yaw, 0.0)
 	# Upright phones: keep the track's width in view and show more road ahead.
 	camera.keep_aspect = Camera3D.KEEP_WIDTH if Tilt.is_portrait() else Camera3D.KEEP_HEIGHT
 	var want_size := Settings.camera_size() * (1.35 if _fly_left > 0.0 else 1.0)
 	camera.size = lerpf(camera.size, want_size, 1.0 - exp(-3.0 * delta))
 	var k := 1.0 - exp(-CAMERA_FOLLOW * delta)
-	camera.global_position = camera.global_position.lerp(_camera_target(), k)
+	_cam_at = _cam_at.lerp(_camera_focus(), k)
+	camera.global_position = _cam_at + camera.global_basis.z * 40.0
 	if _shake > 0.0:
 		camera.h_offset = randf_range(-_shake, _shake)
 		camera.v_offset = randf_range(-_shake, _shake)
 		_shake = maxf(0.0, _shake - delta * 1.5)
 	else:
 		camera.h_offset = 0.0
+		camera.v_offset = 0.0
 		camera.v_offset = 0.0
 
 	if Input.is_action_just_pressed("pause") and (finished or game_complete):
@@ -731,8 +740,12 @@ func _local_progress(pos: Vector2, last: float) -> float:
 		if dd < best_d - 0.01:
 			best_d = dd
 			best = maxf(last, i + a.distance_to(q) / maxf(a.distance_to(b), 0.001))
+	# Far off the nearby legs: only jump to another part of the route when it's
+	# clearly closer (a respawn), not just because a wide area strays off the line.
 	if best_d > 6.0:
-		best = LevelBase.route_progress(_route_world, pos)
+		var g := LevelBase.route_progress(_route_world, pos)
+		if _route_point(g).distance_to(pos) < best_d - 4.0:
+			best = g
 	return best
 
 
@@ -756,8 +769,12 @@ func _route_point(progress: float) -> Vector2:
 	return _route_world[i].lerp(_route_world[i + 1], clampf(progress - i, 0.0, 1.5))
 
 
-func _camera_target() -> Vector3:
-	return _camera_focus() + camera.global_basis.z * 40.0
+## Puts the camera straight on its target (level start, flyover).
+func _snap_camera() -> void:
+	_cam_yaw_vel = 0.0
+	camera.rotation = Vector3(deg_to_rad(CAMERA_ROTATION.x), _cam_yaw, 0.0)
+	_cam_at = _camera_focus()
+	camera.global_position = _cam_at + camera.global_basis.z * 40.0
 
 
 ## What the camera looks at: the marble, or the flyover point along the route.
