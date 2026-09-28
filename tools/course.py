@@ -11,7 +11,7 @@ import os
 
 F = [(1, 0), (0, 1), (-1, 0), (0, -1)]           # forward per heading
 L = [(0, 1), (-1, 0), (0, -1), (1, 0)]           # lateral (right hand) per heading
-H_ROT = {"e": "s", "s": "w", "w": "n", "n": "e"}
+H_ROT = {"e": "s", "s": "w", "w": "n", "n": "e", "a": "b", "b": "d", "d": "c", "c": "a"}
 O_ROT = {">": "v", "v": "<", "<": "^", "^": ">", "x": "z", "z": "x", "X": "Z", "Z": "X",
          "-": "|", "|": "-", "C": "K", "K": "C"}
 
@@ -99,25 +99,35 @@ class Course:
         self.oz += f[1] * p.W
         self.tier += p.exit - p.entry
 
-    def turn(self, d, bank=False):
-        """d=+1 turns to the right-hand lateral, d=-1 to the left."""
+    def turn(self, d, bank=False, w=4, rails=True):
+        """d=+1 turns to the right-hand lateral, d=-1 to the left. `w` is the
+        lane width (4 fills the strip, 2 is a narrow ledge centred in it);
+        without `rails` the corner is open to the void, Marble Madness style."""
+        lo = 1 + (4 - w) // 2
+        hi = lo + w - 1
         hs = [["." for _ in range(6)] for _ in range(6)]
-        for x in range(0, 5):
-            for z in range(1, 5):
+        for x in range(0, 6 - lo):
+            for z in range(lo, hi + 1):
                 hs[z][x] = "0"
-        exit_row = 5 if d > 0 else 0
-        rail_row = 0 if d > 0 else 5
-        for x in range(1, 5):
-            hs[exit_row][x] = "0"
-        for x in range(6):
-            hs[rail_row][x] = "1"
-        for z in range(6):
-            hs[z][5] = "1"
-        hs[exit_row][0] = "1"
-        route = [(0, 2.5), (2.5, 2.5), (2.5, 5.5 if d > 0 else -0.5)]
+        exit_rows = range(hi + 1, 6) if d > 0 else range(0, lo)
+        for x in range(5 - hi, 6 - lo):
+            for z in exit_rows:
+                hs[z][x] = "0"
+        if rails:
+            for z in range(6):
+                for x in range(6):
+                    if hs[z][x] != ".":
+                        continue
+                    near = any(hs[zz][xx] == "0" for xx in (x - 1, x, x + 1) for zz in (z - 1, z, z + 1)
+                               if 0 <= xx < 6 and 0 <= zz < 6)
+                    if near:
+                        hs[z][x] = "1"
+        mid = (lo + hi + 1) / 2.0
+        cx = (5 - hi + 6 - lo) / 2.0 - 0.5
+        route = [(0, mid), (cx, mid), (cx, 5.5 if d > 0 else -0.5)]
         extras = []
         if bank:
-            extras.append({"type": "redirect", "tile": (2.5, 2.5), "yaw": 0.0 if d > 0 else 180.0, "strength": 8.0})
+            extras.append({"type": "redirect", "tile": (cx, mid), "yaw": 0.0 if d > 0 else 180.0, "strength": 8.0})
         piece = Piece(["".join(r) for r in hs], extras=extras, route=route, name="turn")
         f, l = F[self.h], L[self.h]
         tier = self.tier

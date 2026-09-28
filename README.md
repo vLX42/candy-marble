@@ -45,17 +45,19 @@ menu.
 
 | # | Level | Par | What's in it |
 |---|---|---|---|
-| 1 | Sugar Hill | 78 s | Wide slopes, a hedge maze with a key switch, a hidden bridge, a locked pinball table |
-| 2 | Gumdrop Fork | 60 s | The road splits twice: the gate key is in the fast sweeper lane. A maze in between |
-| 3 | Waffle Falls | 68 s | Tall waffle cliffs (falls break you), a waffle maze, beams and a hump bridge |
-| 4 | Licorice Derby | 38 s | RACE: boost lanes, banked U-turns, a jump |
-| 5 | Sprinkle Islands | 55 s | Island hopping by kicker, cannon and catapult, a maze island. Easter eggs! |
-| 6 | Clockwork Bakery | 68 s | A timed gate at the end of the big stomper press, a maze, fast sweepers |
-| 7 | Sour Swamp | 78 s | Planks over goo, a goo maze with a key, humps and ghosts. Goo melts you |
-| 8 | Pinball Wizard | 66 s | Two real pinball tables: flippers, jets, orbit, plunger. Clear the targets to get out |
-| 9 | Rollercoaster Ridge | 72 s | Speed: loops, the chute, a bridge puzzle, leaps, a cannon, a pinball table |
-| 10 | Candy Summit | 60 s | Final RACE, uphill to the summit flag |
+| 1 | Practice Slopes | 120 s | The Practice Race: rolling striped hillsides with no rails, pyramids, a kicker, and a slope straight down the screen to the hole |
+| 2 | Steelie Steps | 130 s | The Beginner Race: a walled plateau of pillars with the black steelie, the long steep ramp, stairs, a pipe, zigzag ledges, the blue wave. Falls break you |
+| 3 | Muncher Walkways | 140 s | The Intermediate Race: walkways with no walls (the key is in a dead end), green munchers, acid slime, grated ramps, the spoon catapult, hump bridges |
+| 4 | Catwalk Derby | 85 s | The Aerial Race as a RACE: a banked half-pipe, catwalks over nothing, the chute |
+| 5 | Starlight Islands | 100 s | Islands in space: leaps and cannons. Easter egg behind the start! |
+| 6 | Stomper Works | 120 s | The hammers: stomper gates, the timed press gate, windmills, a sweeper bridge, a button bridge |
+| 7 | Sour Gorge | 130 s | The acid: planks over goo, slime blobs, beams over a sour lake, ghosts |
+| 8 | Pinball Pyramids | 110 s | Pyramids and bumpers, a real pinball table (clear the targets to get out), a mini table |
+| 9 | Silly Sundae | 110 s | The Silly Race: slopes roll you up, monsters squish, crossing beams, loops |
+| 10 | Ultimate Candy | 110 s | The Ultimate Race as the final RACE: dips, ice, steelies, stompers and slime at once |
 
+Every level is built around one idea from the six Marble Madness races and no
+set piece appears twice. Most edges have no rails.
 **Puzzles**: floor switches open candy gates (some only for a few seconds) or
 raise hidden bridges; pinball exits open when their drop target bank is down.
 **Pinball tables** are laid out like the real thing: plunger lane (skill
@@ -71,17 +73,23 @@ then get tired), licorice windmills (they swat, they don't pop).
 ## Making levels
 
 Levels are two ASCII maps of 2x2 tiles, see the legend at the top of
-`scripts/level_base.gd` (heights `0-9`, ramps `e w s n`, objects like `S G B >`,
-sweepers `x---` / `z|`, checkpoints, trenches, waves, decor...). Loops, cannons,
-hoops, spinners, slingshots and speed banks go in `extras`.
+`scripts/level_base.gd` (heights `0-9`, ramps `e w s n`, diagonal ramps
+`a b c d`, objects like `S G B >`, sweepers `x---` / `z|`, checkpoints,
+trenches, waves, decor...). Loops, cannons, hoops, spinners, slingshots and
+speed banks go in `extras`.
 
-The shipped levels are stitched together from track pieces (straights, waves,
-bumper fields, sweeper gates, bridges, ramps, drops, kicker jumps, loops,
-rivers, pinball tables, cannon hops, corners) by `tools/course.py`; each level
-is a list of pieces in `tools/genlevels.py`:
+A run of ramp tiles between two heights is one slope: one tile for two steps
+is steep, six tiles is gentle. Diagonal ramps (`a` rises towards -x-z, `b`
++x-z, `c` -x+z, `d` +x+z) make Marble Madness style inclines that run straight
+down the screen; paint a band of two or more between two plateaus.
+
+The shipped levels are stitched together from track pieces (straights, ramps,
+drops, turns, ledges, sweepers, hoppers...) by `tools/course.py`; the basic
+pieces live in `tools/genlevels.py`, the set pieces and the ten level plans in
+`tools/make_campaign.py`:
 
 ```bash
-python3 tools/genlevels.py
+python3 tools/make_campaign.py
 ```
 
 ## Level editor and quests
@@ -221,6 +229,7 @@ godot --headless --fixed-fps 120 -s tests/editor_test.gd   # editor tools, undo,
 godot --headless --fixed-fps 120 -s tests/sections_test.gd # sections, Road join-ups, guide steps
 godot --headless --fixed-fps 120 -s tests/madness_test.gd  # hard landings, goo, humps, tall steps
 godot --headless --fixed-fps 120 -s tests/flow_test.gd     # countdown, pause, ghost replay, test from here
+godot --headless --fixed-fps 120 -s tests/diagonal_test.gd # diagonal ramp tiles
 godot --headless --fixed-fps 120 -s tests/original_test.gd # pipe, ice, slime, steelie, GOAL pad, silly, arcade clock
 godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/marble_madness.json
 godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/madness_returns.json

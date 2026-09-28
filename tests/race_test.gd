@@ -4,7 +4,7 @@ extends SceneTree
 ## 1) rival sinks first, player rolls in after: 2nd place, level not cleared.
 ## 2) player sinks first: race won, rival stops.
 
-## Licorice Derby, the first race.
+## Catwalk Derby, the first race.
 const RACE_LEVEL := 3
 
 var main: Node3D

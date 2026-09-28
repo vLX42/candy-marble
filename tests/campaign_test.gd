@@ -30,7 +30,7 @@ func _process(delta: float) -> bool:
 	match phase:
 		0:
 			if pt > 0.5:
-				_check("level 5 is Sprinkle Islands", main.level.title == "Sprinkle Islands", main.level.title)
+				_check("level 5 is Starlight Islands", main.level.title == "Starlight Islands", main.level.title)
 				for n in main.world.get_children():
 					if n is Secret:
 						secret = n

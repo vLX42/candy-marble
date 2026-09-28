@@ -211,8 +211,8 @@ func _tools() -> void:
 	ed.crop()
 	_check("crop keeps a border", ed.cols() <= wc + 1 and _find("G").x < 28, "cols %d G %s" % [ed.cols(), _find("G")])
 
-	# Quest: remix a built-in level, add and order levels.
-	ed.ui._remix(0)
+	# Quest: remix a built-in level (Stomper Works, it has sweepers), add and order levels.
+	ed.ui._remix(5)
 	_check("remix built-in level", ed.quest.levels.size() == 2 and ed.li == 1, str(ed.quest.levels.size()))
 	var remix: Dictionary = ed.quest.levels[1]
 	var sweepers := 0

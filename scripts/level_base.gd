@@ -10,6 +10,12 @@ extends RefCounted
 ##   e w s n ramp rising towards +x / -x / +z / -z. A run of ramp tiles blends
 ##          between the flat tiles at both ends. If the high end is void it's a
 ##          kicker (jump ramp) rising 0.35 per unit.
+##   a b c d diagonal ramp rising towards -x-z / +x-z / -x+z / +x+z (the
+##          corner of that 2x2 letter grid). Marble Madness slopes: a band of
+##          these between two plateaus with diagonal edges is one straight
+##          incline. A run of n tiles is flat over the half tile at both ends,
+##          so it meets the plateaus exactly, and slopes over the n-1 tiles
+##          between: use two or more.
 ##
 ## objects map
 ##   S spawn         G golf hole        B pop bumper       H hill
@@ -35,6 +41,9 @@ const TRENCH_DEPTH := 0.8
 const SWEEPER_SPEED := 2.8
 const SWEEPER_FAST := 4.5
 const HUMP_HEIGHT := 0.9
+const RAMPS := ["e", "w", "s", "n", "a", "b", "c", "d"]
+## Diagonal ramp char -> the tile direction it rises towards.
+const DIAG := {"a": Vector2i(-1, -1), "b": Vector2i(1, -1), "c": Vector2i(-1, 1), "d": Vector2i(1, 1)}
 
 var title := ""
 var time_limit := 60.0  ## par time in seconds (medals: gold <= par, silver <= 1.3x, bronze <= 1.7x)
@@ -80,6 +89,7 @@ var _trenches: Array = []        # [Vector2 a, Vector2 b] world
 var _hills: Array[Vector4] = []  # x, z, height, radius
 var _waves := {}                 # Vector2i tile -> true
 var _humps := {}                 # Vector2i tile -> [axis (0 = x), start, end (world), humps]
+var _diag_cache := {}            # Vector2i tile -> diagonal ramp band (see _diag)
 
 
 func build() -> void:
@@ -87,6 +97,7 @@ func build() -> void:
 	for r in heights:
 		cols = maxi(cols, r.length())
 	entities.clear()
+	_diag_cache.clear()
 	for j in objects.size():
 		var line := objects[j]
 		for i in line.length():
@@ -128,7 +139,11 @@ func is_tile_ground(i: int, j: int) -> bool:
 
 
 func is_ramp(i: int, j: int) -> bool:
-	return tile_char(i, j) in ["e", "w", "s", "n"]
+	return tile_char(i, j) in RAMPS
+
+
+func is_diagonal(i: int, j: int) -> bool:
+	return DIAG.has(tile_char(i, j))
 
 
 func tier_of(i: int, j: int) -> int:
@@ -186,6 +201,9 @@ func _base(i: int, j: int, x: float, z: float) -> float:
 		var f := _flat(i, j)
 		return 0.0 if is_nan(f) else f
 	var c := tile_char(i, j)
+	if DIAG.has(c):
+		var dg := _diag(c, i, j)
+		return _diag_height(dg, x, z)
 	var axis := Vector2i(1, 0) if c in ["e", "w"] else Vector2i(0, 1)
 	var s := Vector2i(i, j)
 	while tile_char(s.x - axis.x, s.y - axis.y) == c:
@@ -208,6 +226,95 @@ func _base(i: int, j: int, x: float, z: float) -> float:
 	if not is_nan(before):
 		return before
 	return 0.0 if is_nan(after) else after
+
+
+## The diagonal ramp through tile (i, j): [d, u0, u1, before, after] where
+## u = x * d.x + z * d.y, the incline runs from u0 to u1 and before / after are
+## the flat heights at the low and high ends (NAN = void). All tiles of one
+## connected band share the numbers, so a band clipped by void or the map edge
+## is still one straight incline.
+func _diag(c: String, i: int, j: int) -> Array:
+	var key := Vector2i(i, j)
+	if _diag_cache.has(key):
+		return _diag_cache[key]
+	var d: Vector2i = DIAG[c]
+	var neg := int(d.x < 0) + int(d.y < 0)
+	var region: Array[Vector2i] = [key]
+	var seen := {key: true}
+	var k := 0
+	while k < region.size():
+		var t := region[k]
+		k += 1
+		for n: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var q: Vector2i = t + n
+			if not seen.has(q) and tile_char(q.x, q.y) == c:
+				seen[q] = true
+				region.append(q)
+	var u_lo := INF
+	var u_hi := -INF
+	for t in region:
+		var u := TILE * (t.x * d.x + t.y * d.y) - TILE * neg   # lowest u on this tile
+		u_lo = minf(u_lo, u)
+		u_hi = maxf(u_hi, u + 2.0 * TILE)
+	# Plateau heights: the flat tiles along the band's lowest and highest edges
+	# (the most common height wins, so a stray rail touching a corner can't
+	# tilt the band); the diagonal corner neighbours only count when no tile
+	# shares an edge.
+	var lo_edge := {}
+	var lo_corner := {}
+	var hi_edge := {}
+	var hi_corner := {}
+	for t in region:
+		var u := TILE * (t.x * d.x + t.y * d.y) - TILE * neg
+		if is_equal_approx(u, u_lo):
+			_count_flat(lo_edge, t - Vector2i(d.x, 0))
+			_count_flat(lo_edge, t - Vector2i(0, d.y))
+			_count_flat(lo_corner, t - d)
+		if is_equal_approx(u + 2.0 * TILE, u_hi):
+			_count_flat(hi_edge, t + Vector2i(d.x, 0))
+			_count_flat(hi_edge, t + Vector2i(0, d.y))
+			_count_flat(hi_corner, t + d)
+	var before := _most_common(lo_edge if not lo_edge.is_empty() else lo_corner)
+	var after := _most_common(hi_edge if not hi_edge.is_empty() else hi_corner)
+	# Flat over the half tile at both ends (a single tile slopes corner to corner).
+	var flat := TILE if u_hi - u_lo > 2.0 * TILE + 0.001 else 0.0
+	var info := [d, u_lo + flat, u_hi - flat, before, after]
+	for t in region:
+		_diag_cache[t] = info
+	return info
+
+
+func _count_flat(tally: Dictionary, t: Vector2i) -> void:
+	var f := _flat(t.x, t.y)
+	if not is_nan(f):
+		tally[f] = tally.get(f, 0) + 1
+
+
+static func _most_common(tally: Dictionary) -> float:
+	var best := NAN
+	var best_n := 0
+	for h: float in tally:
+		if tally[h] > best_n:
+			best_n = tally[h]
+			best = h
+	return best
+
+
+func _diag_height(dg: Array, x: float, z: float) -> float:
+	var d: Vector2i = dg[0]
+	var u := x * d.x + z * d.y
+	var u0: float = dg[1]
+	var u1: float = dg[2]
+	var before: float = dg[3]
+	var after: float = dg[4]
+	if not is_nan(before) and not is_nan(after):
+		return lerpf(before, after, clampf((u - u0) / maxf(u1 - u0, 0.001), 0.0, 1.0))
+	# Kicker: the void end keeps rising. u grows sqrt(2) per unit rolled.
+	if not is_nan(before):
+		return before + maxf(u - u0, 0.0) * KICK / sqrt(2.0)
+	if not is_nan(after):
+		return after + maxf(u1 - u, 0.0) * KICK / sqrt(2.0)
+	return 0.0
 
 
 ## Continuous extras on top of the tiles: hills, trench channels, hole funnel.
@@ -315,7 +422,16 @@ func cell_color(i: int, j: int, x: float, z: float) -> Color:
 	var c: Color
 	if _ice.has(Vector2i(i, j)):
 		return Color("#CFF4FF").srgb_to_linear()
-	if is_ramp(i, j):
+	if is_diagonal(i, j):
+		# Only the incline is ramp coloured: the flat corners belong to the plateaus.
+		var dg := _diag(tile_char(i, j), i, j)
+		var u := x * float(dg[0].x) + z * float(dg[0].y)
+		c = ramp_color
+		if u < dg[1] and not is_nan(dg[3]):
+			c = tier_colors[posmod(roundi(dg[3] / step), tier_colors.size())]
+		elif u > dg[2] and not is_nan(dg[4]):
+			c = tier_colors[posmod(roundi(dg[4] / step), tier_colors.size())]
+	elif is_ramp(i, j):
 		c = ramp_color
 	else:
 		c = tier_colors[posmod(tier_of(i, j), tier_colors.size())]

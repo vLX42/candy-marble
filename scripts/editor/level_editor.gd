@@ -725,8 +725,11 @@ func _ramp_char(t: Vector2i) -> String:
 	# follow the drag.
 	var best := ""
 	var best_rise := 0.0
-	for d: String in ["e", "w", "s", "n"]:
-		var v: Vector2i = {"e": Vector2i(1, 0), "w": Vector2i(-1, 0), "s": Vector2i(0, 1), "n": Vector2i(0, -1)}[d]
+	# Straight ramps first, so a diagonal only wins when it rises more.
+	var dirs := {"e": Vector2i(1, 0), "w": Vector2i(-1, 0), "s": Vector2i(0, 1), "n": Vector2i(0, -1)}
+	dirs.merge(LevelBase.DIAG)
+	for d: String in dirs:
+		var v: Vector2i = dirs[d]
 		var ahead := _tier_along(t, v)
 		var behind := _tier_along(t, -v)
 		if ahead >= 0 and behind >= 0 and ahead - behind > best_rise:
@@ -740,7 +743,7 @@ func _ramp_char(t: Vector2i) -> String:
 			return "e" if drag.x > 0 else "w"
 		return "s" if drag.y > 0 else "n"
 	var cur := hchar(t.x, t.y)
-	return cur if cur in ["e", "w", "s", "n"] else "e"
+	return cur if cur in LevelBase.RAMPS else "e"
 
 
 ## Tier of the first flat tile from t along v, skipping ramp tiles (-1 if void).
@@ -750,7 +753,7 @@ func _tier_along(t: Vector2i, v: Vector2i) -> int:
 		var c := hchar(p.x, p.y)
 		if c.is_valid_int():
 			return int(c)
-		if c not in ["e", "w", "s", "n"]:
+		if c not in LevelBase.RAMPS:
 			return -1
 		p += v
 	return -1

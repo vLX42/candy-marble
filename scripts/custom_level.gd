@@ -14,7 +14,7 @@ extends LevelBase
 const MAX_SIZE := 160
 const MAX_EXTRAS := 400
 const MAX_ROUTE := 400
-const HEIGHT_CHARS := ".0123456789ewsn"
+const HEIGHT_CHARS := ".0123456789ewsnabcd"
 const OBJECT_CHARS := ".SGBHWT><v^xXzZ-|CKltbg%hr$@#AMI"
 
 ## Extras and their tweakable numbers: {param: [default, min, max, label]}.

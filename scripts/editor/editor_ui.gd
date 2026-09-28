@@ -631,7 +631,8 @@ func on_tool_changed() -> void:
 		var g := GridContainer.new()
 		g.columns = 3
 		_options.add_child(g)
-		for pair: Array in [["auto", "Auto"], ["n", "Up"], ["s", "Down"], ["w", "Left"], ["e", "Right"]]:
+		for pair: Array in [["auto", "Auto"], ["n", "Up"], ["s", "Down"], ["w", "Left"], ["e", "Right"],
+				["a", "Up-left"], ["b", "Up-right"], ["c", "Down-left"], ["d", "Down-right"]]:
 			var b := _btn(pair[1], func() -> void:
 				ed.ramp_dir = pair[0]
 				on_tool_changed())
@@ -639,7 +640,7 @@ func on_tool_changed() -> void:
 			b.theme_type_variation = "ToolButton"
 			b.button_pressed = ed.ramp_dir == pair[0]
 			g.add_child(b)
-		_options.add_child(_label("Auto slopes up towards the higher side. Several ramp tiles in a row make a longer, gentler slope.", true))
+		_options.add_child(_label("Auto slopes up towards the higher side. Several ramp tiles in a row make a longer, gentler slope. Diagonal ramps need a band of two or more between two heights.", true))
 	if t == "booster":
 		_options.add_child(CandyTheme.caption("Pushes towards  (R turns)"))
 		var g := GridContainer.new()
@@ -738,7 +739,9 @@ func on_hover(tile: Vector2i) -> void:
 	var what := "void"
 	if c.is_valid_int():
 		what = "height %s" % c
-	elif c in ["e", "w", "s", "n"]:
+	elif LevelBase.DIAG.has(c):
+		what = "diagonal ramp"
+	elif c in LevelBase.RAMPS:
 		what = "ramp"
 	var o := ed.ochar(tile.x, tile.y)
 	if o != "." and LevelEditor.OBJ_NAMES.has(o):

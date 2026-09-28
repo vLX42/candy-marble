@@ -1,5 +1,5 @@
-"""Generates scripts/levels/level_N.gd by stitching track pieces (tools/course.py).
-Run: python3 tools/genlevels.py
+"""Track pieces for the course stitcher (tools/course.py); the campaign in
+tools/make_campaign.py is built from these plus its own set pieces.
 
 Pieces are authored travelling +x in a 6-row strip: rows 0/5 rails, rows 1-4 the
 lane. Route points use tile coordinates where an integer is a tile centre.
@@ -411,52 +411,3 @@ def catapult_launch():
 
 
 # --- levels -------------------------------------------------------------------------
-
-def build(num, title, desc, par, tier, plan, race=False):
-    c = Course(tier=tier)
-    for step in plan:
-        if isinstance(step, tuple) and step[0] == "turn":
-            c.turn(step[1], bank=len(step) > 2)
-        else:
-            c.place(step)
-    c.write(os.path.join(OUT, f"level_{num}.gd"), num, title, desc, par, race)
-
-
-T = lambda d, bank=False: ("turn", d, "bank") if bank else ("turn", d)  # noqa: E731
-
-
-def main():
-    build(1, "Sugar Lane", "A descent from the top of the candy hills to the bottom, every stretch different: slope, slalom, stairs, a funnel, the candy chute, a split path, a leap down, a loop and a river.", 105, 8, [
-        start(), straight(3), slope_down(1), T(+1), slalom(), stairs(2), T(-1), checkpoint(), waves(6),
-        sweepers(1), T(+1), chute_drop(), funnel(), checkpoint(), bumpers(), T(-1), split(), table(), hills(),
-        T(+1), checkpoint(), leap(1), bridge(8, sweep=False), spinners(), loop(), T(-1), river(), kicker(),
-        drop(), finish(),
-    ])
-    build(2, "Gumdrop Pinball", "RACE vs the licorice ball through a pinball park: tables, windmills, a loop, a catapult.", 80, 6, [
-        start(), ramp_down(), table(), T(+1, True), bumpers(), checkpoint(), windmill_plaza(), loop(),
-        T(-1, True), funnel(), spinners(), stairs(2), T(+1, True), checkpoint(), slalom(), catapult_launch(),
-        T(-1, True), waves(6), river(), finish(),
-    ], race=True)
-    build(3, "Sprinkle Skies", "Island hopping: kickers, a hopper lane, a cannon, a leap, a ghost garden and a catapult.", 75, 2, [
-        start(), kicker(), T(+1), bridge(), checkpoint(), hopper_lane(), cannon_hop(), T(-1), leap(1),
-        ghost_garden(), checkpoint(), T(+1), catapult_launch(), split(), T(-1), sweepers(2, True),
-        slope_down(1), finish(),
-    ])
-    build(4, "Licorice Loops", "Down through the licorice works: stompers, the candy chute, windmills and haunted hills.", 90, 8, [
-        start(), river(), drop(), T(+1), loop(), stomper_gate(), checkpoint(), T(-1), chute_drop(),
-        windmill_plaza(), T(+1), checkpoint(), ghost_garden(), hills(), T(-1), stairs(2), sweepers(3),
-        T(+1), checkpoint(), waves(6), slope_down(1), finish(),
-    ])
-    build(5, "Candy Castle", "RACE vs the licorice ball up the castle: hoppers, stompers, cannons and a catapult.", 110, 0, [
-        start(), ramp_up(), sweepers(2), T(+1), bridge(), checkpoint(), hopper_lane(), kicker(), T(-1),
-        stomper_gate(), cannon_hop(), T(+1), checkpoint(), windmill_plaza(), ghost_garden(), T(-1), loop(),
-        catapult_launch(), T(+1), checkpoint(), funnel(), ramp_up(), finish(),
-    ], race=True)
-    build(6, "Pinball Parlor", "Speed run through every pinball toy in the park: tables, cannons, windmills, stompers, a catapult.", 125, 5, [
-        start(), table(), T(+1, True), loop(), cannon_hop(), T(-1, True), bumpers(), spinners(), checkpoint(),
-        windmill_plaza(), catapult_launch(), T(+1, True), funnel(), stomper_gate(), checkpoint(), T(-1, True),
-        slalom(), hopper_lane(), split(), finish(),
-    ])
-
-if __name__ == "__main__":
-    main()

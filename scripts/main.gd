@@ -169,8 +169,8 @@ func _ready() -> void:
 
 ## Music per level (audio/*.mp3), crossfaded on level change.
 const LEVEL_MUSIC := [
-	"Ticking_Gumdrop_Lane", "Gumball_Velocity", "Spun_Sugar_Waltz",
-	"Ticking_Gumdrop_Lane", "Spun_Sugar_Waltz", "Gumball_Velocity",
+	"Ticking_Gumdrop_Lane", "Gumball_Velocity", "Spun_Sugar_Waltz", "Sugar_Coated_Dash", "Gumball_Velocity_2",
+	"Ticking_Gumdrop_Lane", "Spun_Sugar_Waltz", "Sugar_Coated_Dash", "Gumball_Velocity", "Gumball_Velocity_2",
 ]
 const FINISH_MUSIC := "Gold_Star_Finish"
 const MUSIC_DB := -9.0

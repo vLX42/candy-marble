@@ -123,8 +123,11 @@ func _build_tile(i: int, j: int) -> void:
 			_edge(i, j, p01, p00, Vector3.LEFT, xa - hx, cz, pillow)
 
 
-## True if the tile has no waves, hills, trenches or hole on it.
+## True if the tile has no waves, hills, trenches or hole on it (and isn't a
+## diagonal ramp, whose incline starts on a line across the tile).
 func _is_simple(i: int, j: int, x0: float, z0: float) -> bool:
+	if level.is_diagonal(i, j):
+		return false
 	for a in range(0, N + 1, 2):
 		for b in range(0, N + 1, 2):
 			var x := x0 + a * STEP
