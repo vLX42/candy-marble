@@ -71,7 +71,7 @@ const OBJ_CHAR := {spawn = "S", goal = "G", bumper = "B", star = "@", target = "
 	waves = "W", hill = "H", trench = "T", goo = "A", humps = "M", ice = "I"}
 const OBJ_NAMES := {
 	"S": "Start", "G": "Golf hole", "B": "Bumper", ">": "Booster", "<": "Booster", "v": "Booster",
-	"^": "Booster", "C": "Checkpoint", "K": "Checkpoint", "W": "Waves", "H": "Hill", "T": "Trench",
+	"^": "Booster", "C": "Checkpoint", "K": "Checkpoint", "W": "Waves", "H": "Hill", "P": "Cone", "T": "Trench",
 	"@": "Rollover star", "A": "Sour goo", "M": "Humps", "I": "Ice", "#": "Drop target", "l": "Lollipop", "t": "Candy tree", "b": "Gummy bear",
 	"g": "Gumdrop", "%": "Golden cupcake", "h": "Heart candy", "r": "Wrapped candy", "$": "Gem candy",
 }

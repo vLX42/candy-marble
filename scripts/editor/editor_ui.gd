@@ -840,7 +840,7 @@ func _inspector_char(ch: String) -> void:
 		"C": "Saves progress. It spans the whole track across.", "K": "Saves progress. It spans the whole track across.",
 		"B": "Bounces the marble away and fills the Sugar Rush meter.",
 		"W": "Wobbly ripples. Neighbouring wave tiles blend together.",
-		"H": "A round bump.", "T": "A dip. Neighbouring trench tiles join into a channel.",
+		"H": "A round bump.", "P": "A tall cone the marble can't climb.", "T": "A dip. Neighbouring trench tiles join into a channel.",
 		"A": "Sour goo. Rolling in pops the marble.",
 		"I": "Ice: hardly any grip.",
 		"M": "Big humps. A strip of hump tiles makes whole humps along its long side.",

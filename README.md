@@ -55,9 +55,12 @@ menu.
 | 8 | Pinball Pyramids | 110 s | Pyramids and bumpers, a real pinball table (clear the targets to get out), a mini table |
 | 9 | Silly Sundae | 110 s | The Silly Race: slopes roll you up, monsters squish, crossing beams, loops |
 | 10 | Ultimate Candy | 110 s | The Ultimate Race as the final RACE: dips, ice, steelies, stompers and slime at once |
+| 11 | Beginner Race | 120 s | The Beginner Race map, top to bottom: block plateau, the long ramp, cones, the steelie's ledge, the hourglass, the chute, walkways round a pillar, the wave, the GOAL pad |
+| 12 | Silly Race | 110 s | The Silly Race map: cones, crossing beams, the windmill, the bonus field, the GOAL pad. Everything you know is wrong |
 
-Every level is built around one idea from the six Marble Madness races and no
-set piece appears twice. Most edges have no rails.
+Levels 1 to 10 are each built around one idea from the six Marble Madness
+races and no set piece appears twice; 11 and 12 recreate two of the original
+maps piece by piece. Most edges have no rails.
 **Puzzles**: floor switches open candy gates (some only for a few seconds) or
 raise hidden bridges; pinball exits open when their drop target bank is down.
 **Pinball tables** are laid out like the real thing: plunger lane (skill
@@ -71,6 +74,9 @@ then get tired), licorice windmills (they swat, they don't pop).
 **Launchers**: boosters, loops, cannons, the spoon catapult, the candy chute.
 
 ## Making levels
+
+[GAME_ELEMENTS.md](GAME_ELEMENTS.md) lists every tile, object, extra, set
+piece and tool a level designer has to work with.
 
 Levels are two ASCII maps of 2x2 tiles, see the legend at the top of
 `scripts/level_base.gd` (heights `0-9`, ramps `e w s n`, diagonal ramps
@@ -230,6 +236,7 @@ godot --headless --fixed-fps 120 -s tests/sections_test.gd # sections, Road join
 godot --headless --fixed-fps 120 -s tests/madness_test.gd  # hard landings, goo, humps, tall steps
 godot --headless --fixed-fps 120 -s tests/flow_test.gd     # countdown, pause, ghost replay, test from here
 godot --headless --fixed-fps 120 -s tests/diagonal_test.gd # diagonal ramp tiles
+godot --headless -s tools/check_seams.gd -- --level=1          # ramp tiles that don't meet their neighbours
 godot --headless --fixed-fps 120 -s tests/original_test.gd # pipe, ice, slime, steelie, GOAL pad, silly, arcade clock
 godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/marble_madness.json
 godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/madness_returns.json

@@ -15,7 +15,7 @@ const MAX_SIZE := 160
 const MAX_EXTRAS := 400
 const MAX_ROUTE := 400
 const HEIGHT_CHARS := ".0123456789ewsnabcd"
-const OBJECT_CHARS := ".SGBHWT><v^xXzZ-|CKltbg%hr$@#AMI"
+const OBJECT_CHARS := ".SGBHWT><v^xXzZ-|CKltbg%hr$@#AMIP"
 
 ## Extras and their tweakable numbers: {param: [default, min, max, label]}.
 ## "travel" (Vector3) and "target_tile" (Vector2) are handled on their own.
@@ -316,9 +316,16 @@ static func dict_from_level(src: LevelBase, keep_route: bool = true) -> Dictiona
 			route.append([p.x, p.y])
 	return sanitize({
 		title = src.title, description = src.description, par = src.time_limit, race = src.race,
+		silly = src.silly, break_drop = src.break_drop, step = src.step,
 		heights = Array(src.heights), objects = objs, extras = extras, route = route,
 		theme = {tiers = tiers, ramp = "#" + src.ramp_color.to_html(false), wall = "#" + src.wall_color.to_html(false)},
+		monster_speed = src.monster_speed, monster_tint = _tint_text(src.monster_tint),
+		rival_speed = src.rival_speed, rival_tint = _tint_text(src.rival_tint),
 	})
+
+
+static func _tint_text(c: Color) -> String:
+	return "#" + c.to_html(false) if c.a > 0.0 else ""
 
 
 # --- auto route -----------------------------------------------------------------

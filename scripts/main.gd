@@ -15,6 +15,8 @@ const LEVELS: Array[GDScript] = [
 	preload("res://scripts/levels/level_8.gd"),
 	preload("res://scripts/levels/level_9.gd"),
 	preload("res://scripts/levels/level_10.gd"),
+	preload("res://scripts/levels/level_11.gd"),
+	preload("res://scripts/levels/level_12.gd"),
 ]
 
 const SCENES := {

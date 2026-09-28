@@ -29,6 +29,8 @@ THEMES = {
     "pinball": (["#C9B8EC", "#B4A7E8", "#F9C6D3", "#A9C1F0", "#FFE7B3"], "#F6E27A", "#2E2350"),
     "bubblegum": (["#F9C6D3", "#F7B2C0", "#FBD9E4", "#F4A3BA", "#FDE6EE"], "#A9D6F5", "#8A3553"),
     "summit": (["#FDE6EE", "#F9C6D3", "#FBD9E4", "#F7B2C0", "#FFF4E0"], "#F6E27A", "#5A3426"),
+    "beginner": (["#BFE3F7", "#A9D6F5", "#D6E4FB", "#8FC3F0", "#E4F1FC"], "#F7B2C0", "#1F3F8A"),
+    "lemonade": (["#FFF1A8", "#FFE07A", "#FFF6CC", "#F6E27A", "#FFEAB8"], "#F6845E", "#7A5A1E"),
 }
 
 
@@ -396,21 +398,22 @@ def halfpipe(W=12, w=6):
     return zpiece(h, o, zoff, route=[(0, zoff + 2.5), (W - 1, zoff + 2.5)], name="halfpipe")
 
 
-def chute_drop():
-    """Candy chute slide four tiers down over a void."""
+def chute_drop(tiers=4):
+    """Candy chute slide over a void. The chute model drops 2 units: four
+    tiers at the normal step, two at step 1.0."""
     W = 8
     h, o = gridh(W, 6), gridh(W, 6)
     for x in (0, 1):
-        h[0][x] = h[5][x] = "5"
+        h[0][x] = h[5][x] = str(tiers + 1)
         for z in range(1, 5):
-            h[z][x] = "4"
-    h[1][1] = h[4][1] = "5"          # squeeze towards the chute mouth
+            h[z][x] = str(tiers)
+    h[1][1] = h[4][1] = str(tiers + 1)          # squeeze towards the chute mouth
     for x in (6, 7):
         h[0][x] = h[5][x] = "1"
         for z in range(1, 5):
             h[z][x] = "0"
     o[0][0], o[5][7] = "t", "l"
-    return Piece(rows(h), rows(o), entry=4, exit=0,
+    return Piece(rows(h), rows(o), entry=tiers, exit=0,
                  extras=[{"type": "chute", "tile": (3.5, 2.5), "yaw": 90.0, "y_tier": 0}],
                  route=[(0, 2.5), (1.2, 2.5), (6.2, 2.5), (7, 2.5)], name="chute")
 
@@ -679,6 +682,137 @@ def press_run(W=8):
     ], route=[(0, 2.5), (W - 1, 2.5)], name="press_run")
 
 
+
+# --- 11 and 12: the Beginner and Silly Race maps, piece by piece -------------------------------
+
+def block_plateau(W=16, w=10):
+    """The Beginner Race's top: an open plateau with four sunken-top blocks.
+    The marble starts here."""
+    H, zoff = wide(w)
+    h, o = gridh(W, H), gridh(W, H)
+    fill(h, 0, 1, W - 1, w, 0)
+    for (x, z) in [(4, 2), (9, 2), (4, w - 3), (9, w - 3)]:
+        fill(h, x, z, x + 1, z + 1, 1)
+        o[z][x] = o[z][x + 1] = o[z + 1][x] = o[z + 1][x + 1] = "T"
+    o[zoff + 2][1] = "S"
+    o[1][W - 2], o[w][1] = "l", "t"
+    return zpiece(h, o, zoff, route=[(1, zoff + 2.5), (7, zoff + 2.5), (W - 1, zoff + 2.5)], name="block_plateau")
+
+
+def cone_plateau(W=14, w=8):
+    """An open plateau with candy cones to dodge; the way out narrows to a
+    two-tile bridge."""
+    H, zoff = wide(w)
+    h, o = gridh(W, H), gridh(W, H)
+    fill(h, 0, 1, W - 4, w, 0)
+    fill(h, W - 3, zoff + 2, W - 1, zoff + 3, 0)
+    for (x, z) in [(3, 2), (7, w - 1), (9, 3), (5, w - 2)]:
+        if z not in (zoff + 2, zoff + 3):
+            o[z][x] = "P"
+    o[1][1], o[w][W - 5] = "g", "%"
+    return zpiece(h, o, zoff, route=[(0, zoff + 2.5), (4, zoff + 2.5), (8, zoff + 2.5), (W - 1, zoff + 2.5)],
+                  name="cone_plateau")
+
+
+def steelie_ledge(W=12):
+    """A two-tile ledge onto a landing where the black steelie waits."""
+    h, o = gridh(W, 6), gridh(W, 6)
+    fill(h, 0, 2, W - 5, 3, 0)
+    fill(h, W - 4, 1, W - 1, 4, 0)
+    o[1][W - 2] = "h"
+    return Piece(rows(h), rows(o), extras=[{"type": "steelie", "tile": (W - 2, 1), "sense": 7.0, "leash": 8.0, "speed": 3.4}],
+                 route=[(0, 2.5), (W - 1, 2.5)], name="steelie_ledge")
+
+
+def hourglass(W=9):
+    """Walls pinch the lane to a single tile in the middle."""
+    h, o = g.lane(W), g.grid(W)
+    for x in range(2, W - 2):
+        h[1][x] = h[4][x] = "2"
+    for x in (3, 4, 5):
+        h[2][x] = "2"
+    o[0][1], o[5][W - 2] = "l", "g"
+    return Piece(rows(h), rows(o), route=[(0, 2.5), (2, 3), (6, 3), (W - 1, 2.5)], name="hourglass")
+
+
+def pillar_walkways(W=14, w=10):
+    """A tall pillar with a two-tile walkway wrapped round three of its sides."""
+    H, zoff = wide(w)
+    h, o = gridh(W, H), gridh(W, H)
+    lo, hi = zoff + 2, zoff + 3
+    fill(h, 0, lo, 3, hi, 0)                 # in
+    fill(h, 2, 1, 3, hi, 0)                  # up the near side
+    fill(h, 2, 1, W - 3, 2, 0)               # along the top
+    fill(h, W - 4, 1, W - 3, hi, 0)          # down the far side
+    fill(h, W - 4, lo, W - 1, hi, 0)         # out
+    fill(h, 5, 4, W - 6, w, 4)               # the pillar
+    o[1][W // 2], o[hi][1] = "%", "r"
+    return zpiece(h, o, zoff, route=[(0, 2.5 + zoff), (2.5, 2.5 + zoff), (2.5, 1.5), (W - 3.5, 1.5),
+                                     (W - 3.5, 2.5 + zoff), (W - 1, 2.5 + zoff)], name="pillar_walkways")
+
+
+def wave_floor(W=12, w=8):
+    """The blue wave: a wide rippled floor before the goal."""
+    H, zoff = wide(w)
+    h, o = gridh(W, H), gridh(W, H)
+    fill(h, 0, 1, W - 1, w, 0)
+    for x in range(1, W - 1):
+        for z in range(1, w + 1):
+            o[z][x] = "W"
+    return zpiece(h, o, zoff, route=[(0, zoff + 2.5), (W - 1, zoff + 2.5)], name="wave_floor")
+
+
+def goal_pad(W=8):
+    """The checkered GOAL pad between the flags."""
+    h, o = g.lane(W), g.grid(W)
+    for z in range(6):
+        h[z][W - 1] = "1"
+    o[0][W - 3], o[5][W - 3], o[0][2], o[5][2] = "%", "%", "l", "t"
+    return Piece(rows(h), rows(o), extras=[{"type": "goalpad", "tile": (W - 3, 2.5)}],
+                 route=[(0, 2.5), (3, 2.5), (W - 3, 2.5)], name="goal_pad")
+
+
+def cone_walk(W=12):
+    """Cones line both sides of the lane."""
+    h, o = g.lane(W), g.grid(W)
+    for x in range(2, W - 2, 3):
+        o[1][x] = "P"
+        o[4][x + 1] = "P"
+    return Piece(rows(h), rows(o), route=[(0, 2.5), (W - 1, 2.5)], name="cone_walk")
+
+
+def bonus_field(W=16, w=8):
+    """The Silly Race's sunken field of little blocks, treats and squishable
+    monsters."""
+    H, zoff = wide(w)
+
+    def paint(h, o):
+        fill(h, 1, 1, W - 2, H - 2, 0)
+        for (x, z) in [(3, 2), (6, 6), (8, 2), (11, 7), (13, 3), (5, 8), (10, 5)]:
+            if z not in (zoff + 2, zoff + 3):
+                h[z][x] = "1"
+        for (x, z) in [(4, 1), (9, H - 2), (14, 1), (2, H - 2)]:
+            o[z][x] = "%"
+    extras = [
+        {"type": "hopper", "tile": (5, zoff + 1), "travel_tiles": (0, 3), "period": 3.4, "hops": 2},
+        {"type": "hopper", "tile": (11, zoff + 4), "travel_tiles": (0, -3), "period": 3.0, "hops": 2, "phase": 0.5},
+    ]
+    return arena(W, H, zoff, paint, "bonus_field", extras=extras,
+                 route=[(0, zoff + 2.5), (W - 1, zoff + 2.5)])
+
+
+def cone_cross(W=14, w=8):
+    """Crossing beams with a cone on every dead end (the Silly Race X's)."""
+    H, zoff = wide(w)
+    h, o = gridh(W, H), gridh(W, H)
+    fill(h, 0, zoff + 2, W - 1, zoff + 3, 0)
+    cx = W // 2
+    fill(h, cx - 1, 0, cx, H - 1, 0)
+    o[0][cx - 1], o[H - 1][cx] = "P", "P"
+    o[zoff + 2][2], o[zoff + 3][W - 3] = "%", "h"
+    return zpiece(h, o, zoff, route=[(0, zoff + 2.5), (W - 1, zoff + 2.5)], name="cone_cross")
+
+
 # --- writer -----------------------------------------------------------------------------
 
 def fmt(v):
@@ -921,7 +1055,34 @@ def level_10():
           110, "summit", race=True, rival_tint="#2b2438", rival_speed=1.0)
 
 
-LEVELS = [level_1, level_2, level_3, level_4, level_5, level_6, level_7, level_8, level_9, level_10]
+def level_11():
+    """The Beginner Race, top to bottom: the block plateau, the long ramp,
+    the cone plateau, the steelie's ledge, the hourglass, the chute, the
+    walkways round the pillar, the wave and the GOAL pad."""
+    c = run(Course(tier=8), [
+        block_plateau(16, 10), T(+1), g.straight(2), steep(6, 5, 4), ledge(3), g.checkpoint(), T(-1),
+        cone_plateau(14, 8), ledge(4, 2), T(+1, w=2, rails=False), steelie_ledge(12), step_down(1, 4, 4),
+        g.checkpoint(), T(-1), hourglass(9), g.straight(2), T(+1), chute_drop(2), g.checkpoint(), T(-1),
+        pillar_walkways(14, 10), T(+1), g.straight(2), g.checkpoint(), wave_floor(12, 8), goal_pad(8),
+    ])
+    write(11, c, "Beginner Race", "The Beginner Race, top to bottom: the long ramp, the steelie, the chute, the wave.",
+          120, "beginner", step=1.0, break_drop=3)
+
+
+def level_12():
+    """The Silly Race, top to bottom: cones, crossing beams, the windmill,
+    the bonus field, more crossings, the GOAL pad. Everything you know is wrong."""
+    c = run(Course(tier=3), [
+        g.start(), cone_walk(12), T(+1), cross_bridges(12, 8), g.straight(2), T(-1), cone_cross(14, 8),
+        g.checkpoint(), T(+1), g.windmill_plaza(), g.ramp_up(), T(-1), bonus_field(16, 8), g.checkpoint(),
+        T(+1), g.sweepers(2), cone_cross(12, 8), T(-1), g.ramp_up(), cone_walk(9), g.checkpoint(), T(+1),
+        cross_bridges(14, 8), g.straight(2), goal_pad(8),
+    ])
+    write(12, c, "Silly Race", "The Silly Race. Everything you know is wrong: slopes roll you up, monsters squish.",
+          110, "lemonade", silly=True)
+
+
+LEVELS = [level_1, level_2, level_3, level_4, level_5, level_6, level_7, level_8, level_9, level_10, level_11, level_12]
 
 if __name__ == "__main__":
     only = [int(a) for a in sys.argv[1:]]
