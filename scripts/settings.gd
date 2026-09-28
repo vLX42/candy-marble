@@ -93,6 +93,17 @@ func _apply() -> void:
 		DisplayServer.window_set_mode(want)
 
 
+## The web build runs on the Compatibility renderer (WebGL 2), which lights
+## ambient much stronger than Forward+: the pastels wash out to white. Call
+## this on every Environment after setting it up; it does nothing on Forward+.
+const COMPAT_AMBIENT := 0.55
+
+
+static func match_renderer(env: Environment) -> void:
+	if RenderingServer.get_current_rendering_method() == "gl_compatibility":
+		env.ambient_light_energy *= COMPAT_AMBIENT
+
+
 ## Applies the graphics setting to an Environment and a sun.
 func apply_graphics(env: Environment, sun: DirectionalLight3D) -> void:
 	env.ssao_enabled = graphics_high

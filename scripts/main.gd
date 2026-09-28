@@ -1127,6 +1127,7 @@ func _setup_environment() -> void:
 	env.fog_depth_end = 90.0
 	env.fog_density = 0.6
 	env.fog_sky_affect = 0.0
+	Settings.match_renderer(env)
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)

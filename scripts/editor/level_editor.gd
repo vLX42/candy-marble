@@ -255,6 +255,7 @@ func _setup_environment() -> void:
 	env.tonemap_white = 1.6
 	env.adjustment_enabled = true
 	env.adjustment_saturation = 1.15
+	Settings.match_renderer(env)
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)

@@ -29,6 +29,12 @@ func _ready() -> void:
 	mat.emission_energy_multiplier = 0.35
 	mat.roughness = 0.15
 	mat.clearcoat_enabled = true
+	if RenderingServer.get_current_rendering_method() == "gl_compatibility":
+		# The web renderer bleaches see-through glowing goo to a pale yellow:
+		# go solid, no glow, a touch darker.
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+		mat.albedo_color = Color("#7CCB3E")
+		mat.emission_enabled = false
 	slab.material_override = mat
 	slab.position.y = 0.05
 	slab.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
