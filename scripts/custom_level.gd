@@ -44,6 +44,7 @@ const EXTRA_PARAMS := {
 		leash = [10.0, 3.0, 30.0, "Leash length"]},
 	"slime": {period = [5.0, 1.0, 20.0, "Trip time (s)"], phase = [0.0, 0.0, 1.0, "Start offset"]},
 	"pipe": {speed = [6.0, 2.0, 14.0, "Exit speed"]},
+	"bird": {speed = [6.0, 2.0, 14.0, "Flying speed"]},
 	"goalpad": {},
 	"loop": {},
 	"chute": {y = [0.0, -2.0, 6.0, "Height"]},
@@ -51,7 +52,7 @@ const EXTRA_PARAMS := {
 ## Extras that move and can be recoloured and sped up.
 const MONSTERS := ["enemy", "stomper", "hopper", "ghost", "windmill", "steelie", "slime"]
 const HAS_TRAVEL := ["enemy", "hopper", "slime"]
-const HAS_TARGET := ["catapult", "cannon", "pipe"]
+const HAS_TARGET := ["catapult", "cannon", "pipe", "bird"]
 
 const THEMES := {
 	"Candy": {tiers = ["#A8E6C8", "#C9B8EC", "#BFE3F7", "#F9C6D3", "#FFE7B3"], ramp = "#F6E27A", wall = "#5A3426"},

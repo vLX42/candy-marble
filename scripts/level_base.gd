@@ -19,7 +19,7 @@ extends RefCounted
 ##
 ## objects map
 ##   S spawn         G golf hole        B pop bumper       H hill
-##   P cone: a tall narrow spike the marble can't climb (Marble Madness pyramids)
+##   P cone: a solid candy spike the marble bounces off (Marble Madness pyramids)
 ##   W wavy ground (Marble Madness style ripples, fades out at the edges)
 ##   T trench (neighbouring T tiles join into channels)
 ##   > < v ^ booster towards +x / -x / +z / -z
@@ -459,7 +459,7 @@ func _parse_object(c: String, i: int, j: int) -> void:
 		"H":
 			_hills.append(Vector4(p.x, p.y, 1.1, 0.9))
 		"P":
-			_hills.append(Vector4(p.x, p.y, 2.6, 0.7))
+			entities.append({type = "cone", pos = p})
 		"W":
 			_waves[Vector2i(i, j)] = true
 		"T":

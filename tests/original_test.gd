@@ -50,6 +50,7 @@ func _initialize() -> void:
 			{type = "steelie", tile = [4, 9], sense = 12.0, leash = 20.0},
 			{type = "goalpad", tile = [18, 8]},
 			{type = "enemy", tile = [7, 4], travel = [0, 0, 0], period = 3.0},
+			{type = "bird", tile = [1, 5], target_tile = [5, 5]},
 		],
 	}
 	var silly := base.duplicate(true)
@@ -118,14 +119,26 @@ func _process(delta: float) -> bool:
 				var moved := Vector2(steelie.global_position.x - v0.x, steelie.global_position.z - v0.z).length()
 				_check("the steelie rolls after the marble", moved > 3.0, "moved %.1f" % moved)
 				mark = 0.0
+				_next()
+		5:  # the bird carries the marble across
+			if mark == 0.0:
+				mark = 1.0
+				_put(Vector2(1, 5), Vector3.ZERO)
+			elif pt < 2.8 and int(pt * 120) % 30 == 0 and "--trace" in OS.get_cmdline_user_args():
+				print("  bird t=%.2f ball %s frozen=%s" % [pt, b.global_position.snapped(Vector3.ONE * 0.1), b.freeze])
+			elif pt > 2.8:  # checked right after the drop, before the steelie comes for it
+				var d := Vector2(b.global_position.x, b.global_position.z).distance_to(Vector2(11, 11))
+				_check("the bird carries the marble to its landing spot", d < 3.0 and b.visible and b.alive and not b.freeze,
+					"%.1f from the spot" % d)
+				mark = 0.0
 				_put(Vector2(18, 8), Vector3.ZERO)
 				_next()
-		5:  # goal pad
+		6:  # goal pad
 			if pt > 1.0:
 				_check("rolling onto the GOAL pad finishes", main.finished, "finished %s" % main.finished)
 				main.start_level(1)
 				_next()
-		6:  # Silly Race
+		7:  # Silly Race
 			if pt > 0.5 and mark == 0.0:
 				mark = 1.0
 				_check("silly level flags the marble", main.level.silly and main.ball.silly, "")
@@ -154,7 +167,7 @@ func _process(delta: float) -> bool:
 				main.time_left = 0.0
 				main.start_level(0)
 				_next()
-		7:  # arcade clock
+		8:  # arcade clock
 			if pt > 0.5 and mark == 0.0:
 				mark = 1.0
 				_check("arcade adds time for the level", main.time_left > 15.0 and main.time_left < 25.0,

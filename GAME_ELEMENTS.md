@@ -49,7 +49,7 @@ no rails: open edges everywhere except where a turn follows a fast descent.
 | `G` | Golf hole | The finish, cut into the ground with a funnel |
 | `B` | Pop bumper | Bounces, fills the Sugar Rush meter |
 | `H` | Hill | Round bump, height 1.1, radius 0.9 |
-| `P` | Cone | Tall narrow spike (2.6 high, radius 0.7) the marble can't climb. Marble Madness pyramids |
+| `P` | Cone | A solid candy spike (2.4 high, base radius 0.75) the marble bounces off. Marble Madness pyramids. A real body, not ground, so silly slopes don't pull the marble into it |
 | `W` | Waves | Small ripples, fade out at the edges of the wave area |
 | `T` | Trench | A dip; neighbouring trenches join into a channel. On top of a raised block it makes a sunken top |
 | `>` `<` `v` `^` | Booster | Sets speed towards +x / -x / +z / -z |
@@ -89,6 +89,7 @@ generator is not clamped but stays inside them.
 | `catapult` | `target_tile` | The spoon: roll into the cup, get flung in a high arc to the target |
 | `cannon` | `target_tile`, `hang` | Fires you to the target; `hang` adds flight time |
 | `pipe` | `target_tile`, `speed` 2..14 | Candy pipe: sucks you in, spits you out at the spout towards the target |
+| `bird` | `target_tile`, `speed` 2..14 | The Silly Race bird: hovers over its perch (a ring on the ground); roll onto it and the bird swoops, carries the marble in an arc and drops it at the target. Put the perch at the end of a dead-end ledge |
 | `chute` | `y` | S-curve slide. The model drops exactly 2 units over 8 world units (4 tiles): place it over a void with the top ledge 2 units above the landing (4 tiers at step 0.5, 2 at step 1.0) |
 | `loop` | | A vertical loop; needs booster speed |
 | `hoop` | `height` 0.8..9 | Decorative ring to fly through |
@@ -144,14 +145,12 @@ Set pieces (`tools/make_campaign.py`, each used in one level):
 | 9 Silly Sundae | cross_bridges, loop |
 | 10 Ultimate Candy | checker_dips, ice_lane, steelie_run, press_run |
 | 11 Beginner Race | block_plateau, cone_plateau, steelie_ledge, hourglass, pillar_walkways, wave_floor, goal_pad |
-| 12 Silly Race | start_plateau, cone_walk, slot_ledge, terrace_room, cone_cross |
+| 12 Silly Race | summit_box, slot_ledge, bird_perch, terrace_room, cross_ramps (sloped X), goal_pit, turns with `cone = True` |
 
-Turns also take `cone = True` (a cone on the outer corner tile). Not in a
-silly level: silly physics pushes the marble UP every slope, so a cone next
-to a narrow ledge pulls it in and flings it off (the bot died there every
-time). Not possible in this engine: one path crossing *over* another. The
-ground is a height map with one height per tile, so crossings are level
-(they still read as an X on screen). Also untested: the race rival under
+Turns take `cone = True` for a cone on the outer corner tile. Not possible
+in this engine: one path crossing *over* another. The ground is a height map
+with one height per tile, so the X in level 12 is two sloped bridges that
+meet at the same height in the middle. Also untested: the race rival under
 silly physics.
 
 Turns: `T(d, bank, w, rails)`. `w = 2` is a narrow ledge corner, `rails =

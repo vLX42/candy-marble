@@ -42,6 +42,8 @@ const SCENES := {
 	"steelie": preload("res://scenes/steelie.tscn"),
 	"slime": preload("res://scenes/slime.tscn"),
 	"pipe": preload("res://scenes/candy_pipe.tscn"),
+	"bird": preload("res://scenes/bird.tscn"),
+	"cone": preload("res://scenes/cone.tscn"),
 	"goalpad": preload("res://scenes/goal_pad.tscn"),
 	"switch": preload("res://scenes/candy_switch.tscn"),
 }

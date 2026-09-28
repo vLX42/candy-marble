@@ -56,7 +56,7 @@ menu.
 | 9 | Silly Sundae | 110 s | The Silly Race: slopes roll you up, monsters squish, crossing beams, loops |
 | 10 | Ultimate Candy | 110 s | The Ultimate Race as the final RACE: dips, ice, steelies, stompers and slime at once |
 | 11 | Beginner Race | 120 s | The Beginner Race map, top to bottom: block plateau, the long ramp, cones, the steelie's ledge, the hourglass, the chute, walkways round a pillar, the wave, the GOAL pad |
-| 12 | Silly Race | 120 s | The Silly Race map: the walled plateau, cone pinches, open S-bend ledges with slots, the pipe across the canyon, the terrace room with hoppers, the crossings, the GOAL pad. Everything you know is wrong |
+| 12 | Silly Race | 100 s | The Silly Race map, section by section: the walled summit funnelling out between cones, the cone ridge S-bends with slots, the bird over the chasm, the monster pit with its terrace, the sloped X crossing, the sunken GOAL basin. Everything you know is wrong |
 
 Levels 1 to 10 are each built around one idea from the six Marble Madness
 races and no set piece appears twice; 11 and 12 recreate two of the original
@@ -71,7 +71,9 @@ The levels are built by `tools/make_campaign.py` (`python3 tools/make_campaign.p
 **Hazards**: sweepers (wind-up blocks), gumdrop hoppers (go under mid-hop),
 marshmallow stompers (pass while they're up), sour ghosts (they chase you,
 then get tired), licorice windmills (they swat, they don't pop).
-**Launchers**: boosters, loops, cannons, the spoon catapult, the candy chute.
+**Launchers**: boosters, loops, cannons, the spoon catapult, the candy chute,
+the pipe, the bird that carries you over the chasm. **Cones** are solid
+spikes you bounce off.
 
 ## Making levels
 
