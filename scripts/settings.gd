@@ -93,15 +93,62 @@ func _apply() -> void:
 		DisplayServer.window_set_mode(want)
 
 
-## The web build runs on the Compatibility renderer (WebGL 2), which lights
-## ambient much stronger than Forward+: the pastels wash out to white. Call
-## this on every Environment after setting it up; it does nothing on Forward+.
-const COMPAT_AMBIENT := 0.55
+## The web build runs on the Compatibility renderer (WebGL 2). Its sky shader
+## can't draw the screen gradient there (it comes out one flat colour), so on
+## that renderer the sky you see is a gradient card fixed far behind the world,
+## facing the camera and filling the view. The real sky stays on behind it for
+## the reflections that light the walls. The card's stops are tuned so the
+## screen shows what Forward+ shows (measured top to bottom), and the ambient
+## light is retuned to match. Call this on every Environment after setting it
+## up; it does nothing on Forward+.
+const COMPAT_AMBIENT := 0.85   # measured best against Forward+ on the title screen
+const SKY_ON_SCREEN := ["#b6dcf3", "#b9dcf2", "#c3daef", "#d0d9ed", "#dbd5ea", "#e6d1e6", "#eecfe3", "#f5cde2", "#f6ccdf"]
 
 
-static func match_renderer(env: Environment) -> void:
-	if RenderingServer.get_current_rendering_method() == "gl_compatibility":
-		env.ambient_light_energy *= COMPAT_AMBIENT
+static func match_renderer(env: Environment, parent: Node) -> void:
+	if RenderingServer.get_current_rendering_method() != "gl_compatibility":
+		return
+	env.ambient_light_energy *= COMPAT_AMBIENT
+	parent.add_child(SkyCard.new())
+
+
+## The web renderer's sky: a camera-facing gradient card at the far end of the view.
+class SkyCard extends MeshInstance3D:
+	func _ready() -> void:
+		name = "SkyBackdrop"
+		top_level = true
+		cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var grad := Gradient.new()
+		var offsets := PackedFloat32Array()
+		var colors := PackedColorArray()
+		for k in SKY_ON_SCREEN.size():
+			offsets.append(k / float(SKY_ON_SCREEN.size() - 1))
+			colors.append(Color(SKY_ON_SCREEN[k]))
+		grad.offsets = offsets
+		grad.colors = colors
+		var tex := GradientTexture2D.new()
+		tex.gradient = grad
+		tex.fill_from = Vector2(0, 0)
+		tex.fill_to = Vector2(0, 1)
+		tex.width = 4
+		tex.height = 256
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.albedo_texture = tex
+		mat.disable_fog = true
+		mat.texture_repeat = false   # or the top and bottom rows blend into each other
+		mesh = QuadMesh.new()
+		material_override = mat
+
+	func _process(_delta: float) -> void:
+		var cam := get_viewport().get_camera_3d()
+		if cam == null:
+			return
+		var view := get_viewport().get_visible_rect().size
+		var h := cam.size if cam.projection == Camera3D.PROJECTION_ORTHOGONAL else 100.0
+		var w := h * view.x / maxf(view.y, 1.0)
+		var depth := cam.far * 0.9
+		global_transform = cam.global_transform * Transform3D(Basis.IDENTITY.scaled(Vector3(w, h, 1.0)), Vector3(0, 0, -depth))
 
 
 ## Applies the graphics setting to an Environment and a sun.

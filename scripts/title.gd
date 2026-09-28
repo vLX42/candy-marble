@@ -87,7 +87,7 @@ func _build_world() -> void:
 	env.ssao_enabled = true
 	env.glow_enabled = true
 	env.glow_intensity = 0.35
-	Settings.match_renderer(env)
+	Settings.match_renderer(env, self)
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
