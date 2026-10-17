@@ -93,6 +93,7 @@ func show_pause(back_label: String, online: bool = false) -> void:
 			items.append(["Recalibrate tilt", "calibrate"])
 		items.append(["Controls: %s" % ("tilt the phone" if Settings.control_mode == "tilt" else "drag to roll"), "controls"])
 	items.append(["Camera: %s" % ("follows the track" if Settings.camera_follow else "fixed"), "camera"])
+	items.append(["Miniature look: %s" % ("on" if Settings.tilt_shift else "off"), "tilt_shift"])
 	if not online:
 		items.append(["Ghost: %s" % ("on" if Settings.ghost else "off"), "ghost"])
 	items.append([back_label, "quit"])

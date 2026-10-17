@@ -14,7 +14,10 @@ par. Best level times and best full runs are saved locally.
 - **Settings**: camera follows the track (default: it snaps between the four
   isometric views and only turns when the track runs back down the screen) or
   fixed isometric, zoom, music and effects volume, graphics high/fast,
-  fullscreen, **Arcade timer**, reset progress.
+  **miniature look**, fullscreen, **Arcade timer**, reset progress.
+- **Miniature look** (tilt-shift, on by default, also in the pause menu): a
+  sharp band follows the marble and the rest blurs out like a close-up photo
+  of a toy model, with a bit more colour and a soft vignette.
 - **Arcade timer** (off by default): like the 1984 cabinet, every level adds
   time to one clock and leftover seconds carry over. Run out and it's
   "Time's up!", R starts over from level 1.

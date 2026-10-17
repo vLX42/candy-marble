@@ -139,6 +139,7 @@ var _cam_view := INF
 var _cam_hold := 0.0
 var _cam_cool := 0.0
 var camera: Camera3D
+var tilt_shift: TiltShift
 var sfx: Sfx
 var scores: Scores
 var level_time := 0.0
@@ -385,6 +386,8 @@ func _run_key() -> String:
 # --- Loop -------------------------------------------------------------------
 
 func _process(delta: float) -> void:
+	if is_instance_valid(ball):
+		tilt_shift.follow(camera, ball.global_position, delta)
 	if _handle_pause():
 		return
 	if _fly_left > 0.0:
@@ -577,6 +580,9 @@ func _on_pause_action(action: String) -> void:
 			start_level(level_index)
 		"camera":
 			Settings.set_value("camera_follow", not Settings.camera_follow)
+			hud.show_pause(_pause_label(), net_race)
+		"tilt_shift":
+			Settings.set_value("tilt_shift", not Settings.tilt_shift)
 			hud.show_pause(_pause_label(), net_race)
 		"toggle":
 			if net_race:
@@ -1216,6 +1222,8 @@ func _setup_camera() -> void:
 	camera.rotation_degrees = CAMERA_ROTATION
 	add_child(camera)
 	camera.make_current()
+	tilt_shift = TiltShift.new()
+	add_child(tilt_shift)
 
 
 func _setup_hud() -> void:

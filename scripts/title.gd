@@ -45,6 +45,7 @@ class DemoLevel extends LevelBase:
 
 var _level: DemoLevel
 var _cam: Camera3D
+var _tilt: TiltShift
 var _t := 0.0
 var _scores := Scores.new()
 var _menu: VBoxContainer
@@ -148,6 +149,9 @@ func _build_world() -> void:
 	_cam.rotation_degrees = Vector3(-35.264, 45.0, 0.0)
 	add_child(_cam)
 	_cam.make_current()
+	_tilt = TiltShift.new()
+	_tilt.focus = 0.6
+	add_child(_tilt)
 
 
 func _process(delta: float) -> void:
@@ -402,6 +406,9 @@ func _build_settings(root: Control) -> void:
 	_settings_panel.add_child(_setting_button(func() -> String:
 		return "Graphics: %s" % ("high" if Settings.graphics_high else "fast"),
 		func() -> void: Settings.set_value("graphics_high", not Settings.graphics_high)))
+	_settings_panel.add_child(_setting_button(func() -> String:
+		return "Miniature look: %s" % ("on" if Settings.tilt_shift else "off"),
+		func() -> void: Settings.set_value("tilt_shift", not Settings.tilt_shift)))
 	_settings_panel.add_child(_setting_button(func() -> String:
 		return "Fullscreen: %s" % ("on" if Settings.fullscreen else "off"),
 		func() -> void: Settings.toggle_fullscreen()))

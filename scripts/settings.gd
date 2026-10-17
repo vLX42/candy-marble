@@ -18,6 +18,9 @@ var sfx_volume := 0.9
 var graphics_high := true
 ## Show a see-through marble replaying your best run on each level.
 var ghost := true
+## The miniature look: a sharp band on the marble, the rest blurred like a
+## photo of a toy model (scripts/tilt_shift.gd).
+var tilt_shift := true
 ## Phones: "tilt" (gyroscope) or "stick" (drag anywhere).
 var control_mode := "tilt"
 var tilt_sensitivity := 1.0
@@ -47,6 +50,7 @@ func _ready() -> void:
 		sfx_volume = cfg.get_value("audio", "sfx", sfx_volume)
 		graphics_high = cfg.get_value("display", "graphics_high", graphics_high)
 		ghost = cfg.get_value("game", "ghost", ghost)
+		tilt_shift = cfg.get_value("display", "tilt_shift", tilt_shift)
 		control_mode = cfg.get_value("game", "control_mode", control_mode)
 		tilt_sensitivity = cfg.get_value("game", "tilt_sensitivity", tilt_sensitivity)
 		arcade = cfg.get_value("game", "arcade", arcade)
@@ -74,6 +78,7 @@ func save() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("display", "fullscreen", fullscreen)
 	cfg.set_value("display", "graphics_high", graphics_high)
+	cfg.set_value("display", "tilt_shift", tilt_shift)
 	cfg.set_value("camera", "follow", camera_follow)
 	cfg.set_value("camera", "zoom", zoom)
 	cfg.set_value("audio", "music", music_volume)
