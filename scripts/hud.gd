@@ -194,6 +194,7 @@ func show_results(r: Dictionary) -> void:
 	_res_board_title.text = r.get("board_title", "BEST TIMES")
 	var hl: int = r.get("highlight", -1)
 	# Rows are times, or [name, time] for an online race (time < 0: didn't finish).
+	var rest_shown := false
 	for k in times.size():
 		var col := Palette.CORAL if k == hl else INK
 		var rank := _plain("%d." % (k + 1), 24, col)
@@ -201,10 +202,25 @@ func show_results(r: Dictionary) -> void:
 		_res_board.add_child(rank)
 		var row: Variant = times[k]
 		if row is Array:
+			# Online race: a podium. Gold, silver and bronze chips for the top
+			# three, then everyone else smaller underneath.
+			_res_board.remove_child(rank)
+			rank.queue_free()
 			var tm: float = row[1]
-			var who := _plain("%s   %s" % [row[0], "%.2f s" % tm if tm >= 0.0 else "DNF"], 24, col)
-			who.custom_minimum_size.x = 100
-			_res_board.add_child(who)
+			var line := "%s   %s" % [row[0], "%.2f s" % tm if tm >= 0.0 else "DNF"]
+			if k < 3 and tm >= 0.0:
+				_res_board.add_child(_chip(_ordinal(k + 1), MEDAL_COLORS[["GOLD", "SILVER", "BRONZE"][k]], 22)[0])
+				_res_board.add_child(_plain(line, 28 - 2 * k, col))
+			else:
+				if not rest_shown:
+					rest_shown = true
+					_res_board.add_child(_plain("", 16, MUTED))
+					_res_board.add_child(_plain("...and the rest", 18, MUTED))
+					_res_board.add_child(_plain("", 16, MUTED))
+				var place := _plain(_ordinal(k + 1), 18, Palette.CORAL if k == hl else MUTED)
+				place.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+				_res_board.add_child(place)
+				_res_board.add_child(_plain(line, 20, Palette.CORAL if k == hl else MUTED))
 			_res_board.add_child(_plain("  YOU" if k == hl else "", 18, Palette.CORAL))
 			continue
 		var t := _plain("%.2f s" % row, 24, col)
@@ -260,6 +276,13 @@ func show_results(r: Dictionary) -> void:
 		var cf := create_tween()
 		cf.tween_interval(0.65)
 		cf.tween_callback(_confetti)
+
+
+static func _ordinal(n: int) -> String:
+	var suffix := "th"
+	if n % 100 < 11 or n % 100 > 13:
+		suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+	return "%d%s" % [n, suffix]
 
 
 ## Pastel confetti bursting out of the top of the results card.

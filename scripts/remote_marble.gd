@@ -34,8 +34,14 @@ func setup(id: int, player_name: String, color: Color) -> void:
 		Palette.tint(model, color)
 	else:
 		Palette.add_mesh(_body, Palette.sphere(0.5), color)
+	RemoteMarble.name_tag(self, player_name, color)
+
+
+## A floating name above a marble (also used on the host's bots).
+static func name_tag(parent: Node3D, text: String, color: Color) -> Label3D:
 	var label := Label3D.new()
-	label.text = player_name
+	label.name = "NameTag"
+	label.text = text
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.no_depth_test = true
 	label.fixed_size = true
@@ -46,7 +52,10 @@ func setup(id: int, player_name: String, color: Color) -> void:
 	label.modulate = color.lightened(0.25)
 	label.outline_modulate = Color("#3A1F2B")
 	label.position = Vector3(0, 1.1, 0)
-	add_child(label)
+	# Stay upright above a rolling marble.
+	label.top_level = parent is RigidBody3D
+	parent.add_child(label)
+	return label
 
 
 func push(pos: Vector3, vel: Vector3, is_alive: bool, at_progress: float) -> void:

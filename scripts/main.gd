@@ -113,6 +113,10 @@ var _net_wait := false          # online: loaded, waiting for the server's GO
 var _net_send := 0.0
 var _net_menu := false          # online: the pause menu is open (the world keeps going)
 var _remotes := {}              # player id -> RemoteMarble
+var _bots := {}                 # online: our bots (we're the host) id -> Rival
+var _bot_done := {}             # bot ids whose finish we've reported
+var _bot_tags := {}             # bot id -> its floating name (kept upright above the rolling marble)
+var _race_clock := 0.0          # online: seconds since GO, still running after we finish (bot times)
 var _ghost_play := PackedVector3Array()
 var _ghost: Node3D
 ## Touch controls (tilt or stick) are driving the input actions.
@@ -422,8 +426,16 @@ func _process(delta: float) -> void:
 	if race_lost:
 		place = "LOST"
 	if net_race:
+		if not _net_wait and _count_left <= 0.0:
+			_race_clock += delta
 		place = _net_place()
 		_net_tick(delta)
+		for id: int in _bot_tags:
+			var bot: Node3D = _bots.get(id)
+			var tag: Label3D = _bot_tags[id]
+			if is_instance_valid(bot) and is_instance_valid(tag):
+				tag.global_position = bot.global_position + Vector3.UP * 1.1
+				tag.visible = bot.visible
 	if Settings.arcade and not test_mode:
 		hud.update(maxf(time_left, 0.0), time_left < 10.0, falls, place)
 	else:
@@ -727,6 +739,8 @@ func race_position() -> int:
 
 
 func _on_rival_goal() -> void:
+	if net_race:
+		return   # online bots report their own finish (_net_tick)
 	rival_time = level_time
 	if finished:
 		return
@@ -1264,12 +1278,32 @@ func _net_setup() -> void:
 	_count_left = 0.0
 	ball.input_lock = 1.0e6
 	_remotes.clear()
+	_bots.clear()
+	_bot_done.clear()
+	_bot_tags.clear()
+	_race_clock = 0.0
 	for id in Net.race_ids():
 		if id == Net.my_id():
 			continue
+		var p: Dictionary = Net.players[id]
+		var at := _net_spawn(int(p.slot))
+		var label := Net.name_of(id) + (" (bot)" if p.get("bot", false) else "")
+		if p.get("bot", false) and int(p.get("owner", 0)) == Net.my_id():
+			# Our bot: the licorice AI racing in our world, a little slower or
+			# faster each so they spread out.
+			var bot: Rival = SCENES.rival.instantiate()
+			bot.level = level
+			bot.position = at
+			bot.cruise *= [0.9, 1.0, 0.95, 1.05, 0.92][absi(id) % 5]
+			world.add_child(bot)
+			Palette.tint(bot, Net.color_of(id))
+			_bot_tags[id] = RemoteMarble.name_tag(bot, label, Net.color_of(id))
+			bot.set("_wait", 1.0e6)
+			_bots[id] = bot
+			continue
 		var r := RemoteMarble.new()
-		r.setup(id, Net.name_of(id), Net.color_of(id))
-		r.position = _net_spawn(int(Net.players[id].slot))
+		r.setup(id, label, Net.color_of(id))
+		r.position = at
 		world.add_child(r)
 		_remotes[id] = r
 	Net.report_loaded()
@@ -1282,6 +1316,8 @@ func _net_go() -> void:
 	_count_left = COUNT_TIME
 	_count_shown = ""
 	ball.input_lock = COUNT_TIME
+	for id: int in _bots:
+		_bots[id].set("_wait", COUNT_TIME)
 
 
 func _net_state(id: int, pos: Vector3, vel: Vector3, alive: bool, progress: float) -> void:
@@ -1305,7 +1341,7 @@ func _net_results(rows: Array) -> void:
 	var me := -1
 	for k in rows.size():
 		var r: Dictionary = rows[k]
-		board.append([r.name, r.time])
+		board.append([r.name + (" (bot)" if r.get("bot", false) else ""), r.time])
 		if int(r.id) == Net.my_id():
 			me = k
 	var winner: Dictionary = rows[0] if not rows.is_empty() else {}
@@ -1335,6 +1371,16 @@ func _net_tick(delta: float) -> void:
 	var p := Vector2(ball.global_position.x, ball.global_position.z)
 	var progress := 1.0e6 if finished else LevelBase.route_progress(_route_world, p)
 	Net.send_state(ball.global_position, ball.linear_velocity, ball.alive and ball.visible, progress)
+	for id: int in _bots:
+		var bot: Rival = _bots[id]
+		if not is_instance_valid(bot):
+			continue
+		if bot.finished and not _bot_done.has(id) and not _net_wait:
+			_bot_done[id] = true
+			Net.report_bot_finish(id, _race_clock)
+		var bp := Vector2(bot.global_position.x, bot.global_position.z)
+		Net.send_bot_state(id, bot.global_position, bot.linear_velocity, bot.alive and bot.visible,
+			1.0e6 if bot.finished else LevelBase.route_progress(_route_world, bp))
 
 
 ## Our place: finishers in finishing order, then everyone else by how far
@@ -1350,6 +1396,12 @@ func _net_place() -> String:
 			continue
 		var r: RemoteMarble = _remotes[id]
 		if is_instance_valid(r) and r.progress > mine:
+			ahead += 1
+	for id: int in _bots:
+		var bot: Rival = _bots[id]
+		if Net.finish_order.has(id) or not is_instance_valid(bot):
+			continue
+		if LevelBase.route_progress(_route_world, Vector2(bot.global_position.x, bot.global_position.z)) > mine:
 			ahead += 1
 	return _ordinal(ahead + 1)
 

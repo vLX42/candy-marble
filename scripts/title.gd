@@ -62,9 +62,12 @@ var _online_status: Label
 var _online_players: VBoxContainer
 var _online_waiting: Label
 var _name_edit: LineEdit
-var _server_edit: LineEdit
 var _level_pick: OptionButton
+var _bot_pick: OptionButton
+var _host_row: HBoxContainer
+var _race_info: Label
 var _start_button: Button
+var _ready_button: Button
 var _connect_button: Button
 
 
@@ -373,8 +376,7 @@ func _start(index: int) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel") and (_levels_panel.visible or _settings_panel.visible):
 		_show_menu()
-	elif event.is_action_pressed("ui_cancel") and _online_panel.visible and not _name_edit.has_focus() \
-			and not _server_edit.has_focus():
+	elif event.is_action_pressed("ui_cancel") and _online_panel.visible and not _name_edit.has_focus():
 		_leave_online()
 
 
@@ -487,8 +489,9 @@ func _play_music() -> void:
 
 # --- online race ----------------------------------------------------------------------
 
-## The online panel: connect to a server, then the lobby (players, the host
-## picks a level and starts). See scripts/net.gd.
+## The online panel: join the race server (candy.vlx.dk, see Net.SERVER_URL),
+## then the lobby: everyone but the host says Ready, the host picks the level
+## and how many bots fill the empty seats, then starts. See scripts/net.gd.
 func _build_online(root: Control) -> void:
 	_online_panel = VBoxContainer.new()
 	_online_panel.position = Vector2(84, 48)
@@ -503,21 +506,16 @@ func _build_online(root: Control) -> void:
 	_online_form = VBoxContainer.new()
 	_online_form.add_theme_constant_override("separation", 8)
 	_online_panel.add_child(_online_form)
+	_online_form.add_child(_small_label("Race other people on the same level, up to six at a time."))
 	_online_form.add_child(_small_label("Your name"))
 	_name_edit = LineEdit.new()
 	_name_edit.max_length = 16
 	_name_edit.text = Settings.player_name
 	_name_edit.placeholder_text = "Player"
 	_name_edit.custom_minimum_size = Vector2(480, 0)
+	_name_edit.text_submitted.connect(func(_t: String) -> void: _connect())
 	_online_form.add_child(_name_edit)
-	_online_form.add_child(_small_label("Server"))
-	_server_edit = LineEdit.new()
-	_server_edit.text = _default_server()
-	_server_edit.placeholder_text = "wss://marble.example.com  or  192.168.1.15:9080"
-	_server_edit.custom_minimum_size = Vector2(480, 0)
-	_server_edit.text_submitted.connect(func(_t: String) -> void: _connect())
-	_online_form.add_child(_server_edit)
-	_connect_button = _button("Connect", _connect)
+	_connect_button = _button("Join", _connect)
 	_online_form.add_child(_connect_button)
 
 	_online_lobby = VBoxContainer.new()
@@ -526,14 +524,28 @@ func _build_online(root: Control) -> void:
 	_online_players = VBoxContainer.new()
 	_online_players.add_theme_constant_override("separation", 4)
 	_online_lobby.add_child(_online_players)
+	_race_info = _small_label("")
+	_online_lobby.add_child(_race_info)
+	_host_row = HBoxContainer.new()
+	_host_row.add_theme_constant_override("separation", 12)
+	_online_lobby.add_child(_host_row)
 	_level_pick = OptionButton.new()
 	for i in MainGame.LEVELS.size():
 		var lvl: LevelBase = MainGame.LEVELS[i].new()
 		_level_pick.add_item("%d  %s" % [i + 1, lvl.title], i)
-	_level_pick.custom_minimum_size = Vector2(480, 0)
-	_online_lobby.add_child(_level_pick)
-	_start_button = _button("Start race", func() -> void: Net.request_start(_level_pick.get_selected_id()))
+	_level_pick.custom_minimum_size = Vector2(320, 0)
+	_level_pick.item_selected.connect(func(_i: int) -> void: _send_settings())
+	_host_row.add_child(_level_pick)
+	_bot_pick = OptionButton.new()
+	_bot_pick.custom_minimum_size = Vector2(148, 0)
+	_bot_pick.item_selected.connect(func(_i: int) -> void: _send_settings())
+	_host_row.add_child(_bot_pick)
+	_start_button = _button("Start race", func() -> void: Net.request_start())
 	_online_lobby.add_child(_start_button)
+	_ready_button = _button("I'm ready", func() -> void:
+		var me: Dictionary = Net.players.get(Net.my_id(), {})
+		Net.set_ready(not me.get("ready", false)))
+	_online_lobby.add_child(_ready_button)
 	_online_waiting = _small_label("")
 	_online_lobby.add_child(_online_waiting)
 
@@ -553,18 +565,6 @@ func _small_label(text: String) -> Label:
 	return l
 
 
-## The server to offer: ?server= on the web page, then the last one used,
-## then the one baked into the build (project setting).
-func _default_server() -> String:
-	if OS.has_feature("web"):
-		var q: Variant = JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('server') || ''")
-		if q is String and q != "":
-			return q
-	if Settings.server_url != "":
-		return Settings.server_url
-	return str(ProjectSettings.get_setting("candy_marble/online/default_server", ""))
-
-
 func _show_online() -> void:
 	_menu.visible = false
 	for c in _front:
@@ -572,25 +572,24 @@ func _show_online() -> void:
 	_online_panel.visible = true
 	_refresh_online()
 	if Net.is_online():
-		(_start_button if Net.is_host() else _online_panel.get_child(-1) as Button).grab_focus()
+		(_start_button if Net.is_host() else _ready_button).grab_focus()
 	else:
 		_connect_button.grab_focus()
 
 
 func _connect() -> void:
-	var url := _server_edit.text.strip_edges()
-	if url == "":
-		_online_status.text = "Type the server address first."
-		return
 	Settings.set_value("player_name", _name_edit.text.strip_edges())
-	Settings.set_value("server_url", url)
-	Net.connect_to(url, _name_edit.text)
+	Net.join(_name_edit.text)
 	_refresh_online()
 
 
 func _leave_online() -> void:
 	Net.leave()
 	_show_menu()
+
+
+func _send_settings() -> void:
+	Net.set_settings(_level_pick.get_selected_id(), _bot_pick.get_selected_id())
 
 
 func _refresh_online() -> void:
@@ -600,15 +599,16 @@ func _refresh_online() -> void:
 	_online_form.visible = not online
 	_online_lobby.visible = online
 	_connect_button.disabled = Net.status == "connecting"
+	_connect_button.text = "Joining..." if Net.status == "connecting" else "Join"
 	_online_status.text = Net.status_text if not online else ""
 	for c in _online_players.get_children():
 		_online_players.remove_child(c)
 		c.queue_free()
 	if not online:
 		return
-	var ids: Array = Net.players.keys()
-	ids.sort_custom(func(a: int, b: int) -> bool: return Net.players[a].slot < Net.players[b].slot)
+	var ids := Net.humans()
 	_online_players.add_child(_small_label("Lobby  %d / %d" % [ids.size(), Net.MAX_PLAYERS]))
+	var not_ready := []
 	for id: int in ids:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
@@ -623,6 +623,10 @@ func _refresh_online() -> void:
 			tags.append("you")
 		if id == Net.host_id:
 			tags.append("host")
+		elif Net.players[id].get("ready", false):
+			tags.append("ready")
+		else:
+			not_ready.append(Net.name_of(id))
 		if Net.players[id].get("in_race", false) and Net.phase != "lobby":
 			tags.append("racing")
 		who.text = Net.name_of(id) + ("   (%s)" % ", ".join(tags) if not tags.is_empty() else "")
@@ -630,12 +634,30 @@ func _refresh_online() -> void:
 		row.add_child(who)
 		_online_players.add_child(row)
 	var host := Net.is_host()
-	_level_pick.visible = host
+	var lvl_title: String = MainGame.LEVELS[clampi(Net.level, 0, MainGame.LEVELS.size() - 1)].new().title
+	_race_info.text = "Next race: level %d  %s,  %s" % [Net.level + 1, lvl_title,
+		"no bots" if Net.bots == 0 else ("1 bot" if Net.bots == 1 else "%d bots" % Net.bots)]
+	_host_row.visible = host
 	_start_button.visible = host
-	_start_button.disabled = Net.phase != "lobby"
+	_ready_button.visible = not host
+	if host:
+		_level_pick.select(Net.level)
+		var room := Net.max_bots()
+		if _bot_pick.item_count != room + 1:
+			_bot_pick.clear()
+			for k in room + 1:
+				_bot_pick.add_item("No bots" if k == 0 else ("1 bot" if k == 1 else "%d bots" % k), k)
+		_bot_pick.select(clampi(Net.bots, 0, room))
+	var me: Dictionary = Net.players.get(Net.my_id(), {})
+	_ready_button.text = "Not ready" if me.get("ready", false) else "I'm ready"
+	_start_button.disabled = Net.phase != "lobby" or not Net.all_ready()
 	if Net.phase != "lobby":
 		_online_waiting.text = "A race is on. You're in the next one."
+	elif host and not not_ready.is_empty():
+		_online_waiting.text = "Waiting for %s to be ready." % ", ".join(not_ready)
+	elif host and ids.size() == 1:
+		_online_waiting.text = "Waiting for players to join. Start now to race the bots."
 	elif host:
-		_online_waiting.text = "You're the host: pick a level and start when everyone's in."
+		_online_waiting.text = "Everyone's ready. Start when you like."
 	else:
-		_online_waiting.text = "Waiting for %s to start the race..." % Net.name_of(Net.host_id)
+		_online_waiting.text = "Waiting for %s to start the race." % Net.name_of(Net.host_id)

@@ -21,11 +21,13 @@ par. Best level times and best full runs are saved locally.
 - **Races**: on some levels the evil licorice ball races you to the hole. It
   uses boosters, loops and cannons too, and you can bump each other around.
   Win the race to clear the level.
-- **Online races**: up to six players race the same level (desktop and the
-  web version together). Title screen > Online race, type the server address,
-  the first player in picks the level. Your marble is yours, the others are
-  solid marbles in their seat colour with their name on top; each player
-  solves their own switches. The server runs in Docker, see
+- **Online races**: up to six racers on the same level, desktop and the web
+  version together, on the race server at candy.vlx.dk. Title screen > Online
+  race, type your name, Join. Everyone says Ready; the host (first one in)
+  picks the level and how many AI bots fill the empty seats, then starts. The
+  others are solid marbles in their seat colour with their name on top; each
+  player solves their own switches. Results come as a podium: gold, silver,
+  bronze, and the rest. The server runs in Docker on the NAS, see
   [server/README.md](server/README.md).
 - **Sugar Rush**: pinball hits (bumpers, slingshots, spinners, rollovers,
   hoops, targets, loops, cannons) fill the sugar meter. Full meter = 7 seconds

@@ -8,7 +8,7 @@ extends "res://tests/levels_test.gd"
 ## Runs in real time (no --fixed-fps): the network is real time, and a client
 ## fast-forwarding its clock gets dropped by the WebSocket layer.
 ##   godot --headless -s tests/net_bot.gd -- --url=ws://127.0.0.1:9123 --name=Mint \
-##         --players=2 [--host --level=12] [--shot=/path.png]
+##         --players=2 [--host --level=12 --bots=2] [--shot=/path.png]
 ## Run tests/net_test.sh to start a server and two of these.
 
 const TIMEOUT := 300.0      # real seconds
@@ -18,6 +18,8 @@ var my_name := "Bot"
 var host := false
 var want := 2
 var race_level := 11
+var bot_count := 0
+var said_ready := false
 var shot := ""
 var net: Node
 var step := 0
@@ -39,6 +41,8 @@ func _initialize() -> void:
 			host = true
 		elif a.begins_with("--players="):
 			want = int(a.get_slice("=", 1))
+		elif a.begins_with("--bots="):
+			bot_count = int(a.get_slice("=", 1))
 		elif a.begins_with("--level="):
 			race_level = int(a.get_slice("=", 1)) - 1
 		elif a.begins_with("--shot="):
@@ -51,7 +55,7 @@ func _process(delta: float) -> bool:
 	if not started:
 		# Net is only in the tree (and has a multiplayer) from the first frame.
 		started = true
-		net.connect_to(url, my_name)
+		net.join(my_name, url)
 		_say("connecting to %s" % url)
 	clock += delta
 	frame_dt = delta
@@ -62,11 +66,16 @@ func _process(delta: float) -> bool:
 		0:  # in the lobby
 			if net.status == "failed" or net.status == "closed":
 				_done(false, "couldn't connect: %s" % net.status_text)
-			elif net.is_online() and net.players.size() >= want:
-				_say("lobby full: %s" % ", ".join(net.players.values().map(func(p: Dictionary) -> String: return p.name)))
-				if host:
-					net.request_start(race_level)
-				step = 1
+			elif net.is_online():
+				if not host and not said_ready:
+					said_ready = true
+					net.set_ready(true)
+				if net.humans().size() >= want and (not host or (net.is_host() and net.all_ready())):
+					_say("lobby full: %s" % ", ".join(net.humans().map(func(id: int) -> String: return net.name_of(id))))
+					if host:
+						net.set_settings(race_level, bot_count)
+						net.request_start()
+					step = 1
 		1:  # the server starts the race: Net switches to the game scene
 			# Not `is MainGame`: naming it here would compile main.gd before the
 			# autoloads it uses exist.
@@ -126,7 +135,8 @@ func _process(delta: float) -> bool:
 					if r.time >= 0.0:
 						finishers += 1
 				_say("results: " + ", ".join(line))
-				var ok := rows.size() == want and finishers > 0 and (want < 2 or remote_moved > 5.0)
+				var expect: int = want + int(net.bots)
+				var ok: bool = rows.size() == expect and finishers > 0 and (expect < 2 or remote_moved > 5.0)
 				_done(ok, "%d racers, %d finished, the others' marbles moved %.1f" % [rows.size(), finishers, remote_moved])
 	return false
 
