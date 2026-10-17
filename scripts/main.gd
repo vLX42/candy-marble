@@ -87,6 +87,9 @@ static var quest: Quest = null
 static var test_mode := false
 ## Test play from a picked tile instead of the start (editor "Test from here").
 static var test_start := Vector2i(-1, -1)
+## Online race (set by Net when the server starts one): no rival, no pausing
+## the world, the countdown waits for everyone, other players' marbles show up.
+static var net_race := false
 
 @export var first_level := 0
 ## Off for tests: stay on the level after reaching the goal.
@@ -106,6 +109,10 @@ const GHOST_DT := 0.05
 var _count_left := 0.0
 var _count_shown := ""
 var _ghost_rec := PackedVector3Array()
+var _net_wait := false          # online: loaded, waiting for the server's GO
+var _net_send := 0.0
+var _net_menu := false          # online: the pause menu is open (the world keeps going)
+var _remotes := {}              # player id -> RemoteMarble
 var _ghost_play := PackedVector3Array()
 var _ghost: Node3D
 ## Touch controls (tilt or stick) are driving the input actions.
@@ -158,6 +165,14 @@ func _ready() -> void:
 	if test_mode:
 		save_scores = false
 		auto_advance = false
+	if net_race:
+		save_scores = false
+		auto_advance = false
+		Net.go.connect(_net_go)
+		Net.remote_state.connect(_net_state)
+		Net.finish_update.connect(_net_finish_update)
+		Net.results.connect(_net_results)
+		Net.status_changed.connect(_net_status)
 	scores = Scores.new(save_scores)
 	_setup_input()
 	_setup_environment()
@@ -245,6 +260,8 @@ func load_level(data: LevelBase) -> void:
 	ball.position = ground(level.spawn) + Vector3.UP * 0.6
 	if test_mode and test_start.x >= 0 and level.is_tile_ground(test_start.x, test_start.y):
 		ball.position = ground(level.tile_center(test_start.x, test_start.y)) + Vector3.UP * 0.6
+	if net_race:
+		ball.position = _net_spawn(int(Net.players.get(Net.my_id(), {}).get("slot", 0)))
 	world.add_child(ball)
 	ball.died.connect(_on_ball_died)
 	ball.silly = level.silly
@@ -258,7 +275,7 @@ func load_level(data: LevelBase) -> void:
 	_route_world.clear()
 	for t in level.route:
 		_route_world.append(level.tile_center_f(t))
-	if level.race:
+	if level.race and not net_race:
 		rival = SCENES.rival.instantiate()
 		rival.level = level
 		rival.position = ground(level.spawn + Vector2(0, LevelBase.TILE)) + Vector3.UP * 0.6
@@ -277,7 +294,7 @@ func load_level(data: LevelBase) -> void:
 	_cam_cool = 0.0
 	_cam_yaw = _track_yaw() if Settings.camera_follow else deg_to_rad(45.0)
 	_snap_camera()
-	hud.set_level(level_index + 1, level.title, level.time_limit, level.race)
+	hud.set_level(level_index + 1, level.title, level.time_limit, level.race or net_race)
 	_update_best_label()
 	var intro := "%s\nPar %.0f s.  Roll to the %s!" % [level.title, level.time_limit, "hole" if level.hole else "goal"]
 	if level.race:
@@ -293,6 +310,8 @@ func load_level(data: LevelBase) -> void:
 	elif level.description != "":
 		var d := level.description.replace("\n", " ")
 		intro = "%s\n%s" % [level.title, d if d.length() <= 90 else d.substr(0, 87) + "..."]
+	if net_race:
+		intro = "%s\nOnline race. Waiting for everyone..." % level.title
 	show_message(intro, 3.0)
 	_count_left = COUNT_TIME if countdown else 0.0
 	_count_shown = ""
@@ -310,6 +329,8 @@ func load_level(data: LevelBase) -> void:
 			rival.set("_wait", _count_left + _fly_left)
 	_ghost_rec = PackedVector3Array()
 	_setup_ghost()
+	if net_race:
+		_net_setup()
 
 
 func _place(e: Dictionary) -> Node3D:
@@ -372,6 +393,8 @@ func _process(delta: float) -> void:
 			ball.input_lock = _count_left
 			if rival:
 				rival.set("_wait", _count_left)
+	elif _net_wait:
+		pass
 	elif _count_left > 0.0:
 		_count_left -= delta
 		var n := "GO!" if _count_left <= 0.0 else str(ceili(_count_left / (COUNT_TIME / 3.0)))
@@ -398,6 +421,9 @@ func _process(delta: float) -> void:
 	var place := "1st" if race_position() == 1 else "2nd"
 	if race_lost:
 		place = "LOST"
+	if net_race:
+		place = _net_place()
+		_net_tick(delta)
 	if Settings.arcade and not test_mode:
 		hud.update(maxf(time_left, 0.0), time_left < 10.0, falls, place)
 	else:
@@ -431,7 +457,7 @@ func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("pause") and (finished or game_complete):
 		_leave()
 		return
-	if Input.is_action_just_pressed("restart"):
+	if Input.is_action_just_pressed("restart") and not net_race:
 		_restart()
 
 
@@ -507,6 +533,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## Esc / Start pauses mid-level. Returns true while paused.
 func _handle_pause() -> bool:
+	if net_race:
+		if Input.is_action_just_pressed("pause") and not finished:
+			_toggle_net_menu()
+		return false
 	var tree := get_tree()
 	if tree.paused:
 		sfx.stop_roll()
@@ -529,14 +559,20 @@ func _on_pause_action(action: String) -> void:
 	match action:
 		"resume":
 			_resume()
+			_net_menu = false
 		"restart":
 			_resume()
 			start_level(level_index)
 		"camera":
 			Settings.set_value("camera_follow", not Settings.camera_follow)
-			hud.show_pause("Back to the editor" if test_mode else "Quit to menu")
+			hud.show_pause(_pause_label(), net_race)
 		"toggle":
-			if get_tree().paused:
+			if net_race:
+				if finished:
+					_leave()
+				else:
+					_toggle_net_menu()
+			elif get_tree().paused:
 				_resume()
 			elif finished or game_complete:
 				_leave()
@@ -565,6 +601,12 @@ func _on_pause_action(action: String) -> void:
 
 
 func _leave() -> void:
+	if net_race:
+		net_race = false
+		Net.leave_race()
+		TitleScreen.open_page = "online"
+		Transition.go("res://scenes/title.tscn")
+		return
 	if test_mode:
 		test_mode = false
 		test_start = Vector2i(-1, -1)
@@ -853,9 +895,16 @@ func dust(pos: Vector3, amount: float) -> void:
 
 func _on_goal() -> void:
 	# Nothing counts before GO (the marble can't move then anyway).
-	if finished or _fly_left > 0.0 or _count_left > 0.0:
+	if finished or _fly_left > 0.0 or _count_left > 0.0 or _net_wait:
 		return
 	finished = true
+	if net_race:
+		sfx.play("goal")
+		burst(ball.global_position + Vector3.UP * 0.8, [Palette.LEMON, Palette.PINK, Palette.MINT, Palette.LILAC, Palette.SKY], 60, 7.0)
+		Net.report_finish(level_time, level_falls)
+		hud.show_results({title = "Finished!", time = level_time,
+			info = "Waiting for the others...", buttons = [["Leave race", "quit"]]})
+		return
 	if race_lost:
 		sfx.play("pop")
 		hud.show_results({title = "2nd place", time = level_time,
@@ -1160,3 +1209,153 @@ func _setup_hud() -> void:
 	add_child(hud)
 	hud.stamp.connect(func() -> void: sfx.play("coin", -9.0, 0.1))
 	hud.pause_action.connect(_on_pause_action)
+
+
+# --- online race (see scripts/net.gd) ------------------------------------------------
+
+func _pause_label() -> String:
+	if net_race:
+		return "Leave the race"
+	return "Back to the editor" if test_mode else "Quit to menu"
+
+
+func _toggle_net_menu() -> void:
+	_net_menu = not _net_menu
+	if _net_menu:
+		hud.show_pause(_pause_label(), true)
+	else:
+		hud.hide_pause()
+
+
+## Where seat `slot` starts: side by side across the first stretch of track,
+## nearest the middle first, only on solid ground at the start's height.
+func _net_spawn(slot: int) -> Vector3:
+	var start := ground(level.spawn) + Vector3.UP * 0.6
+	if slot <= 0 or level.route.size() < 2:
+		return start
+	var a := level.tile_center_f(level.route[0])
+	var b := a
+	for k in range(1, level.route.size()):
+		b = level.tile_center_f(level.route[k])
+		if b.distance_to(a) > 1.0:
+			break
+	var fwd := (b - a).normalized()
+	var side := Vector2(-fwd.y, fwd.x)
+	var offsets := [0.0, 1.3, -1.3, 2.6, -2.6, 3.9, -3.9, 1.3, -1.3, 2.6, -2.6]
+	var back := [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.4, -1.4, -1.4, -1.4]
+	var used := 0
+	for k in range(1, offsets.size()):
+		var p: Vector2 = level.spawn + side * offsets[k] + fwd * back[k]
+		var t := level.tile_at(p.x, p.y)
+		if not level.is_tile_ground(t.x, t.y) or absf(level.height(p.x, p.y) - level.height(level.spawn.x, level.spawn.y)) > 0.05:
+			continue
+		used += 1
+		if used == slot:
+			return ground(p) + Vector3.UP * 0.6
+	return start + Vector3(0, 1.2 * slot, 0)
+
+
+## Online race start: hold the marble until GO, add the other players' marbles,
+## tell the server we're ready.
+func _net_setup() -> void:
+	_net_wait = true
+	_net_menu = false
+	_fly_left = 0.0
+	_count_left = 0.0
+	ball.input_lock = 1.0e6
+	_remotes.clear()
+	for id in Net.race_ids():
+		if id == Net.my_id():
+			continue
+		var r := RemoteMarble.new()
+		r.setup(id, Net.name_of(id), Net.color_of(id))
+		r.position = _net_spawn(int(Net.players[id].slot))
+		world.add_child(r)
+		_remotes[id] = r
+	Net.report_loaded()
+
+
+func _net_go() -> void:
+	if not _net_wait:
+		return
+	_net_wait = false
+	_count_left = COUNT_TIME
+	_count_shown = ""
+	ball.input_lock = COUNT_TIME
+
+
+func _net_state(id: int, pos: Vector3, vel: Vector3, alive: bool, progress: float) -> void:
+	var r: RemoteMarble = _remotes.get(id)
+	if r and is_instance_valid(r):
+		r.push(pos, vel, alive, progress)
+
+
+func _net_finish_update(id: int, _time: float) -> void:
+	if id != Net.my_id():
+		var place := Net.finish_order.find(id) + 1
+		cheer("%s %s!" % [Net.name_of(id).to_upper(), _ordinal(place).to_upper()], ball.global_position + Vector3.UP * 2.0)
+		return
+	var mine := Net.finish_order.find(id) + 1
+	hud.show_results({title = "You finished %s!" % _ordinal(mine), time = level_time,
+		info = "Waiting for the others...", buttons = [["Leave race", "quit"]], confetti = mine == 1})
+
+
+func _net_results(rows: Array) -> void:
+	var board := []
+	var me := -1
+	for k in rows.size():
+		var r: Dictionary = rows[k]
+		board.append([r.name, r.time])
+		if int(r.id) == Net.my_id():
+			me = k
+	var winner: Dictionary = rows[0] if not rows.is_empty() else {}
+	var title := "Race over"
+	if not winner.is_empty() and float(winner.time) >= 0.0:
+		title = "You win!" if int(winner.id) == Net.my_id() else "%s wins!" % winner.name
+	hud.show_results({title = title, board_title = "RESULTS", board = board, highlight = me,
+		info = "Back to the lobby in a few seconds", buttons = [["Leave", "quit"]], confetti = me == 0})
+
+
+func _net_status() -> void:
+	if not Net.is_online() and net_race:
+		hud.sticky = "Lost the connection to the server.  Esc  back to the menu"
+		show_message(hud.sticky)
+		_net_wait = false
+		if _count_left <= 0.0 and level_time <= 0.0:
+			_count_left = COUNT_TIME
+			ball.input_lock = COUNT_TIME
+
+
+## Sends our marble about 20 times a second.
+func _net_tick(delta: float) -> void:
+	_net_send -= delta
+	if _net_send > 0.0 or ball == null:
+		return
+	_net_send = 1.0 / Net.STATE_RATE
+	var p := Vector2(ball.global_position.x, ball.global_position.z)
+	var progress := 1.0e6 if finished else LevelBase.route_progress(_route_world, p)
+	Net.send_state(ball.global_position, ball.linear_velocity, ball.alive and ball.visible, progress)
+
+
+## Our place: finishers in finishing order, then everyone else by how far
+## along the track they are.
+func _net_place() -> String:
+	var me := Net.my_id()
+	if Net.finish_order.has(me):
+		return _ordinal(Net.finish_order.find(me) + 1)
+	var mine := LevelBase.route_progress(_route_world, Vector2(ball.global_position.x, ball.global_position.z))
+	var ahead := Net.finish_order.size()
+	for id: int in _remotes:
+		if Net.finish_order.has(id):
+			continue
+		var r: RemoteMarble = _remotes[id]
+		if is_instance_valid(r) and r.progress > mine:
+			ahead += 1
+	return _ordinal(ahead + 1)
+
+
+static func _ordinal(n: int) -> String:
+	var suffix := "th"
+	if n % 100 < 11 or n % 100 > 13:
+		suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+	return "%d%s" % [n, suffix]

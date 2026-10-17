@@ -21,6 +21,12 @@ par. Best level times and best full runs are saved locally.
 - **Races**: on some levels the evil licorice ball races you to the hole. It
   uses boosters, loops and cannons too, and you can bump each other around.
   Win the race to clear the level.
+- **Online races**: up to six players race the same level (desktop and the
+  web version together). Title screen > Online race, type the server address,
+  the first player in picks the level. Your marble is yours, the others are
+  solid marbles in their seat colour with their name on top; each player
+  solves their own switches. The server runs in Docker, see
+  [server/README.md](server/README.md).
 - **Sugar Rush**: pinball hits (bumpers, slingshots, spinners, rollovers,
   hoops, targets, loops, cannons) fill the sugar meter. Full meter = 7 seconds
   of rush: faster, grippier, and you phase straight through sweepers.
@@ -247,6 +253,7 @@ godot --headless --fixed-fps 120 -s tests/madness_test.gd  # hard landings, goo,
 godot --headless --fixed-fps 120 -s tests/flow_test.gd     # countdown, pause, ghost replay, test from here
 godot --headless --fixed-fps 120 -s tests/diagonal_test.gd # diagonal ramp tiles
 godot --headless --fixed-fps 120 -s tests/puzzle_test.gd   # switch sets, order, timed combos, levers, the steelie's brain
+bash tests/net_test.sh                                     # online race: a server and two bots race level 12 (real time, ~1 min)
 godot -s tests/shots.gd -- --windowed --puzzles           # screenshots at every switch in the campaign
 godot --headless -s tools/check_seams.gd -- --level=1          # ramp tiles that don't meet their neighbours
 godot --headless --fixed-fps 120 -s tests/original_test.gd # pipe, ice, slime, steelie, GOAL pad, silly, arcade clock

@@ -55,15 +55,32 @@ var _fullscreen_button: Button
 var _theme := Theme.new()
 var _quests: QuestBrowser
 var _front: Array[Control] = []
+var _online_panel: VBoxContainer
+var _online_form: VBoxContainer
+var _online_lobby: VBoxContainer
+var _online_status: Label
+var _online_players: VBoxContainer
+var _online_waiting: Label
+var _name_edit: LineEdit
+var _server_edit: LineEdit
+var _level_pick: OptionButton
+var _start_button: Button
+var _connect_button: Button
 
 
 func _ready() -> void:
+	# The dedicated server (Docker on the NAS) has nothing to show.
+	if Net.server_mode:
+		get_tree().change_scene_to_file.call_deferred("res://scenes/server.tscn")
+		return
 	Quest.install_samples()
 	_build_world()
 	_build_ui()
 	_play_music()
 	if open_page == "quests":
 		_show_quests()
+	elif open_page == "online":
+		_show_online()
 	open_page = ""
 
 
@@ -173,7 +190,7 @@ func _build_ui() -> void:
 		_menu.add_child(_button("New run", func() -> void: _start(0)))
 	else:
 		_menu.add_child(play)
-	_menu.add_child(_button("Levels", _show_levels))
+	_menu.add_child(_pair(_button("Levels", _show_levels), _button("Online race", _show_online)))
 	_menu.add_child(_pair(_button("Quests", _show_quests), _button("Level editor", _open_editor)))
 	if OS.has_feature("web"):
 		# No quitting a web page.
@@ -216,6 +233,7 @@ func _build_ui() -> void:
 		grid.add_child(b)
 	_levels_panel.add_child(_button("Back", _show_menu))
 	_build_settings(root)
+	_build_online(root)
 
 	var hint := Label.new()
 	hint.text = "WASD / arrows / stick to roll    R restart    Esc menu    F11 fullscreen"
@@ -326,6 +344,7 @@ func _show_levels() -> void:
 func _show_menu() -> void:
 	_levels_panel.visible = false
 	_settings_panel.visible = false
+	_online_panel.visible = false
 	_quests.visible = false
 	for c in _front:
 		c.visible = true
@@ -354,6 +373,9 @@ func _start(index: int) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel") and (_levels_panel.visible or _settings_panel.visible):
 		_show_menu()
+	elif event.is_action_pressed("ui_cancel") and _online_panel.visible and not _name_edit.has_focus() \
+			and not _server_edit.has_focus():
+		_leave_online()
 
 
 # --- settings page ------------------------------------------------------------------
@@ -461,3 +483,159 @@ func _play_music() -> void:
 	p.bus = "Music"
 	p.autoplay = true
 	add_child(p)
+
+
+# --- online race ----------------------------------------------------------------------
+
+## The online panel: connect to a server, then the lobby (players, the host
+## picks a level and starts). See scripts/net.gd.
+func _build_online(root: Control) -> void:
+	_online_panel = VBoxContainer.new()
+	_online_panel.position = Vector2(84, 48)
+	_online_panel.add_theme_constant_override("separation", 10)
+	_online_panel.visible = false
+	root.add_child(_online_panel)
+	var head := Label.new()
+	head.text = "Online race"
+	CandyText.style(head, 34)
+	_online_panel.add_child(head)
+
+	_online_form = VBoxContainer.new()
+	_online_form.add_theme_constant_override("separation", 8)
+	_online_panel.add_child(_online_form)
+	_online_form.add_child(_small_label("Your name"))
+	_name_edit = LineEdit.new()
+	_name_edit.max_length = 16
+	_name_edit.text = Settings.player_name
+	_name_edit.placeholder_text = "Player"
+	_name_edit.custom_minimum_size = Vector2(480, 0)
+	_online_form.add_child(_name_edit)
+	_online_form.add_child(_small_label("Server"))
+	_server_edit = LineEdit.new()
+	_server_edit.text = _default_server()
+	_server_edit.placeholder_text = "wss://marble.example.com  or  192.168.1.15:9080"
+	_server_edit.custom_minimum_size = Vector2(480, 0)
+	_server_edit.text_submitted.connect(func(_t: String) -> void: _connect())
+	_online_form.add_child(_server_edit)
+	_connect_button = _button("Connect", _connect)
+	_online_form.add_child(_connect_button)
+
+	_online_lobby = VBoxContainer.new()
+	_online_lobby.add_theme_constant_override("separation", 8)
+	_online_panel.add_child(_online_lobby)
+	_online_players = VBoxContainer.new()
+	_online_players.add_theme_constant_override("separation", 4)
+	_online_lobby.add_child(_online_players)
+	_level_pick = OptionButton.new()
+	for i in MainGame.LEVELS.size():
+		var lvl: LevelBase = MainGame.LEVELS[i].new()
+		_level_pick.add_item("%d  %s" % [i + 1, lvl.title], i)
+	_level_pick.custom_minimum_size = Vector2(480, 0)
+	_online_lobby.add_child(_level_pick)
+	_start_button = _button("Start race", func() -> void: Net.request_start(_level_pick.get_selected_id()))
+	_online_lobby.add_child(_start_button)
+	_online_waiting = _small_label("")
+	_online_lobby.add_child(_online_waiting)
+
+	_online_status = _small_label("")
+	_online_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_online_status.custom_minimum_size = Vector2(480, 0)
+	_online_panel.add_child(_online_status)
+	_online_panel.add_child(_button("Back", _leave_online))
+	Net.changed.connect(_refresh_online)
+	Net.status_changed.connect(_refresh_online)
+
+
+func _small_label(text: String) -> Label:
+	var l := Label.new()
+	l.text = text
+	CandyText.style(l, 22, CandyText.CHOCOLATE, false)
+	return l
+
+
+## The server to offer: ?server= on the web page, then the last one used,
+## then the one baked into the build (project setting).
+func _default_server() -> String:
+	if OS.has_feature("web"):
+		var q: Variant = JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('server') || ''")
+		if q is String and q != "":
+			return q
+	if Settings.server_url != "":
+		return Settings.server_url
+	return str(ProjectSettings.get_setting("candy_marble/online/default_server", ""))
+
+
+func _show_online() -> void:
+	_menu.visible = false
+	for c in _front:
+		c.visible = c != _front[0] and c != _front[1]
+	_online_panel.visible = true
+	_refresh_online()
+	if Net.is_online():
+		(_start_button if Net.is_host() else _online_panel.get_child(-1) as Button).grab_focus()
+	else:
+		_connect_button.grab_focus()
+
+
+func _connect() -> void:
+	var url := _server_edit.text.strip_edges()
+	if url == "":
+		_online_status.text = "Type the server address first."
+		return
+	Settings.set_value("player_name", _name_edit.text.strip_edges())
+	Settings.set_value("server_url", url)
+	Net.connect_to(url, _name_edit.text)
+	_refresh_online()
+
+
+func _leave_online() -> void:
+	Net.leave()
+	_show_menu()
+
+
+func _refresh_online() -> void:
+	if _online_panel == null:
+		return
+	var online := Net.is_online()
+	_online_form.visible = not online
+	_online_lobby.visible = online
+	_connect_button.disabled = Net.status == "connecting"
+	_online_status.text = Net.status_text if not online else ""
+	for c in _online_players.get_children():
+		_online_players.remove_child(c)
+		c.queue_free()
+	if not online:
+		return
+	var ids: Array = Net.players.keys()
+	ids.sort_custom(func(a: int, b: int) -> bool: return Net.players[a].slot < Net.players[b].slot)
+	_online_players.add_child(_small_label("Lobby  %d / %d" % [ids.size(), Net.MAX_PLAYERS]))
+	for id: int in ids:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		var chip := ColorRect.new()
+		chip.color = Net.color_of(id)
+		chip.custom_minimum_size = Vector2(26, 26)
+		chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(chip)
+		var who := Label.new()
+		var tags := []
+		if id == Net.my_id():
+			tags.append("you")
+		if id == Net.host_id:
+			tags.append("host")
+		if Net.players[id].get("in_race", false) and Net.phase != "lobby":
+			tags.append("racing")
+		who.text = Net.name_of(id) + ("   (%s)" % ", ".join(tags) if not tags.is_empty() else "")
+		CandyText.style(who, 26, CandyText.CHOCOLATE, false)
+		row.add_child(who)
+		_online_players.add_child(row)
+	var host := Net.is_host()
+	_level_pick.visible = host
+	_start_button.visible = host
+	_start_button.disabled = Net.phase != "lobby"
+	if Net.phase != "lobby":
+		_online_waiting.text = "A race is on. You're in the next one."
+	elif host:
+		_online_waiting.text = "You're the host: pick a level and start when everyone's in."
+	else:
+		_online_waiting.text = "Waiting for %s to start the race..." % Net.name_of(Net.host_id)

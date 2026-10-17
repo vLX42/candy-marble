@@ -55,6 +55,9 @@ jobs:
           godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/madness_returns.json
           godot --headless --fixed-fps 120 -s tests/levels_test.gd -- --quest=res://quests/sweet_starter.json
 
+      - name: Online race
+        run: bash tests/net_test.sh
+
   version:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -145,6 +148,11 @@ jobs:
           name: candy-marble-builds
           path: dist/*.zip
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-server
+          path: build/linux/CandyMarble.x86_64
+
       - name: Upload site for Pages
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
@@ -165,6 +173,60 @@ jobs:
     steps:
       - id: deploy
         uses: actions/deploy-pages@v4
+
+  # The online race server: the Linux build in a small Docker image. Two bots
+  # race on the image before it's pushed to ghcr.io/vlx42/candy-marble-server.
+  server-image:
+    needs: [export, version]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-server
+          path: server/app
+
+      - name: Build the image
+        run: docker build -t candy-marble-server server
+
+      - name: Install Godot (for the bot clients)
+        run: |
+          curl -sSfL -o godot.zip "$GODOT_BASE/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          sudo mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+
+      - name: Import assets
+        run: godot --headless --import || godot --headless --import
+
+      - name: Two bots race on the image
+        run: |
+          docker run -d --name marble -p 9080:9080 candy-marble-server
+          for i in $(seq 1 30); do
+            docker logs marble 2>&1 | grep -q "listening on port" && break
+            sleep 1
+          done
+          docker logs marble
+          URL=ws://127.0.0.1:9080 bash tests/net_test.sh
+          docker logs marble 2>&1 | tail -20
+
+      - name: Push to ghcr.io
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          IMAGE=ghcr.io/vlx42/candy-marble-server
+          docker tag candy-marble-server "$IMAGE:latest"
+          docker push "$IMAGE:latest"
+          if [ -n "$VERSION" ]; then
+            docker tag candy-marble-server "$IMAGE:$VERSION"
+            docker push "$IMAGE:$VERSION"
+          fi
 
   release:
     needs: [export, version]

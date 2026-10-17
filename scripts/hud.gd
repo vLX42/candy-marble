@@ -78,18 +78,23 @@ func show_count(text: String) -> void:
 	_count_tween.tween_callback(func() -> void: _count.visible = false)
 
 
-func show_pause(back_label: String) -> void:
+## `online`: an online race keeps going while the menu is up, so no restart
+## (it would be a head start) and no ghost.
+func show_pause(back_label: String, online: bool = false) -> void:
 	for c in _pause_box.get_children():
 		if c is Button:
 			_pause_box.remove_child(c)
 			c.queue_free()
-	var items: Array = [["Resume", "resume"], ["Restart level", "restart"]]
+	var items: Array = [["Resume", "resume"]]
+	if not online:
+		items.append(["Restart level", "restart"])
 	if Tilt.is_touch():
 		if Tilt.active():
 			items.append(["Recalibrate tilt", "calibrate"])
 		items.append(["Controls: %s" % ("tilt the phone" if Settings.control_mode == "tilt" else "drag to roll"), "controls"])
 	items.append(["Camera: %s" % ("follows the track" if Settings.camera_follow else "fixed"), "camera"])
-	items.append(["Ghost: %s" % ("on" if Settings.ghost else "off"), "ghost"])
+	if not online:
+		items.append(["Ghost: %s" % ("on" if Settings.ghost else "off"), "ghost"])
 	items.append([back_label, "quit"])
 	for spec: Array in items:
 		var b := Button.new()
@@ -129,7 +134,7 @@ func update(time: float, over_par: bool, falls: int, race_place: String) -> void
 	if _race_row.visible:
 		_race_chip.text = race_place
 		var sb: StyleBoxFlat = _race_chip_box.get_theme_stylebox("panel")
-		sb.bg_color = Palette.MINT if race_place == "1st" else (Palette.PINK if race_place == "2nd" else Palette.RASPBERRY)
+		sb.bg_color = Palette.MINT if race_place == "1st" else (Palette.RASPBERRY if race_place == "LOST" else Palette.PINK)
 		_race_chip.add_theme_color_override("font_color", CandyText.CREAM if race_place == "LOST" else INK)
 
 
@@ -188,12 +193,21 @@ func show_results(r: Dictionary) -> void:
 	_res_board_box.visible = not times.is_empty()
 	_res_board_title.text = r.get("board_title", "BEST TIMES")
 	var hl: int = r.get("highlight", -1)
+	# Rows are times, or [name, time] for an online race (time < 0: didn't finish).
 	for k in times.size():
 		var col := Palette.CORAL if k == hl else INK
 		var rank := _plain("%d." % (k + 1), 24, col)
 		rank.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		_res_board.add_child(rank)
-		var t := _plain("%.2f s" % times[k], 24, col)
+		var row: Variant = times[k]
+		if row is Array:
+			var tm: float = row[1]
+			var who := _plain("%s   %s" % [row[0], "%.2f s" % tm if tm >= 0.0 else "DNF"], 24, col)
+			who.custom_minimum_size.x = 100
+			_res_board.add_child(who)
+			_res_board.add_child(_plain("  YOU" if k == hl else "", 18, Palette.CORAL))
+			continue
+		var t := _plain("%.2f s" % row, 24, col)
 		t.custom_minimum_size.x = 100
 		_res_board.add_child(t)
 		_res_board.add_child(_plain("  NEW" if k == hl else "", 18, Palette.CORAL))
@@ -206,6 +220,8 @@ func show_results(r: Dictionary) -> void:
 	if r.get("next", false):
 		btns.append(["Next level", "next"])
 	btns.append(["Menu", "toggle"])
+	if r.has("buttons"):
+		btns = r.buttons
 	for spec: Array in btns:
 		var b := Button.new()
 		b.text = spec[0]

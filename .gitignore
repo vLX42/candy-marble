@@ -6,3 +6,4 @@ tests/shots/
 blender/__pycache__/
 tools/__pycache__/
 build/
+server/app/

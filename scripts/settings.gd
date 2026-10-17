@@ -24,6 +24,9 @@ var tilt_sensitivity := 1.0
 ## Arcade timer: one countdown for the whole run; each level adds time,
 ## leftovers carry over, zero is game over (like the 1984 arcade game).
 var arcade := false
+## Online races: your name and the last server you joined.
+var player_name := ""
+var server_url := ""
 
 
 func _ready() -> void:
@@ -47,6 +50,8 @@ func _ready() -> void:
 		control_mode = cfg.get_value("game", "control_mode", control_mode)
 		tilt_sensitivity = cfg.get_value("game", "tilt_sensitivity", tilt_sensitivity)
 		arcade = cfg.get_value("game", "arcade", arcade)
+		player_name = cfg.get_value("online", "name", player_name)
+		server_url = cfg.get_value("online", "server", server_url)
 	_apply()
 
 
@@ -77,6 +82,8 @@ func save() -> void:
 	cfg.set_value("game", "control_mode", control_mode)
 	cfg.set_value("game", "tilt_sensitivity", tilt_sensitivity)
 	cfg.set_value("game", "arcade", arcade)
+	cfg.set_value("online", "name", player_name)
+	cfg.set_value("online", "server", server_url)
 	cfg.save(PATH)
 
 

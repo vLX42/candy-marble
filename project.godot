@@ -27,6 +27,7 @@ Settings="*res://scripts/settings.gd"
 Transition="*res://scripts/transition.gd"
 UiSound="*res://scripts/ui_sound.gd"
 Tilt="*res://scripts/tilt.gd"
+Net="*res://scripts/net.gd"
 
 [display]
 
