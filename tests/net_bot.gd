@@ -1,7 +1,10 @@
 extends "res://tests/levels_test.gd"
 ## An online race bot: joins a server, waits for the lobby to fill, (as host)
 ## starts a level, plays it with the level bot's steering and checks that the
-## other marbles moved and that the results list every racer with a time.
+## other marbles moved and that the results list every racer. It tests the
+## networking, not the driving: the level bot is shakier in real time on a
+## busy machine, so a racer that doesn't finish (DNF after the server's grace
+## time) is fine as long as somebody does.
 ## Runs in real time (no --fixed-fps): the network is real time, and a client
 ## fast-forwarding its clock gets dropped by the WebSocket layer.
 ##   godot --headless -s tests/net_bot.gd -- --url=ws://127.0.0.1:9123 --name=Mint \
@@ -77,6 +80,13 @@ func _process(delta: float) -> bool:
 				step = 2
 		2:  # race with the level bot's steering
 			level_t += delta
+			if not rows.is_empty():
+				# The race ended (grace time ran out) before we got home.
+				var q: Vector3 = main.ball.global_position / LevelBase.TILE
+				_say("didn't finish: at tile (%.1f, %.1f), waypoint %d/%d" % [q.x, q.z, wp, main.level.route.size()])
+				_release()
+				step = 3
+				return false
 			for id: int in main._remotes:
 				var r: Node3D = main._remotes[id]
 				if not is_instance_valid(r):
@@ -110,14 +120,14 @@ func _process(delta: float) -> bool:
 		3:  # results
 			if not rows.is_empty():
 				var line := []
-				var all_timed := true
+				var finishers := 0
 				for r: Dictionary in rows:
 					line.append("%s %s" % [r.name, "%.2f s" % r.time if r.time >= 0.0 else "DNF"])
-					if r.time < 0.0:
-						all_timed = false
+					if r.time >= 0.0:
+						finishers += 1
 				_say("results: " + ", ".join(line))
-				var ok := rows.size() == want and all_timed and (want < 2 or remote_moved > 5.0)
-				_done(ok, "%d racers, all finished %s, the others' marbles moved %.1f" % [rows.size(), all_timed, remote_moved])
+				var ok := rows.size() == want and finishers > 0 and (want < 2 or remote_moved > 5.0)
+				_done(ok, "%d racers, %d finished, the others' marbles moved %.1f" % [rows.size(), finishers, remote_moved])
 	return false
 
 

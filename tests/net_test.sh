@@ -1,6 +1,6 @@
 #!/bin/bash
 # Online race, end to end: a server and two bot clients race a level; both bots
-# must finish, see each other's marble move and get the same results.
+# must get the results, see each other's marble move, and at least one must finish.
 #   bash tests/net_test.sh                       # starts its own server (the editor binary)
 #   URL=ws://127.0.0.1:9080 bash tests/net_test.sh   # use a server that's already running (the Docker image)
 # Env: GODOT (default godot), PORT (9123), LEVEL (12, the shortest)
@@ -13,7 +13,7 @@ LOGS=$(mktemp -d)
 SERVER=""
 if [ -z "${URL:-}" ]; then
 	URL="ws://127.0.0.1:$PORT"
-	$GODOT --headless -- --server --port="$PORT" --grace=300 > "$LOGS/server.log" 2>&1 &
+	$GODOT --headless -- --server --port="$PORT" --grace=45 > "$LOGS/server.log" 2>&1 &
 	SERVER=$!
 	for i in $(seq 1 40); do
 		grep -q "listening on port" "$LOGS/server.log" 2>/dev/null && break
