@@ -37,13 +37,15 @@ void fragment() {
 	} else {
 		float lod = log2(max(px * 0.35, 1.0));
 		vec2 r = px * SCREEN_PIXEL_SIZE;
+		// A small blur needs few taps; the full count only far from the band.
+		int n = clamp(int(px * 1.5) + 4, 4, taps);
 		vec3 sum = vec3(0.0);
-		for (int i = 0; i < taps; i++) {
+		for (int i = 0; i < n; i++) {
 			float a = float(i) * 2.39996;
-			float d = sqrt((float(i) + 0.5) / float(taps));
+			float d = sqrt((float(i) + 0.5) / float(n));
 			sum += textureLod(screen_tex, uv + vec2(cos(a), sin(a)) * d * r, lod).rgb;
 		}
-		col = sum / float(taps);
+		col = sum / float(n);
 	}
 	COLOR = vec4(grade(col, uv), 1.0);
 }

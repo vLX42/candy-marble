@@ -57,6 +57,8 @@ func _ready() -> void:
 		player_name = cfg.get_value("online", "name", player_name)
 		server_url = cfg.get_value("online", "server", server_url)
 	_apply()
+	if DisplayServer.get_name() != "headless":
+		get_tree().root.size_changed.connect(_apply_render_scale)
 
 
 func camera_size() -> float:
@@ -92,11 +94,31 @@ func save() -> void:
 	cfg.save(PATH)
 
 
+## The 3D view is drawn at most this many pixels, then scaled up to the window
+## (the HUD stays sharp). Fullscreen on a big Retina screen is 40+ megapixels,
+## which costs far more than it shows; the tilt-shift blurs most of it anyway.
+const MAX_3D_PIXELS_HIGH := 3840.0 * 2160.0
+const MAX_3D_PIXELS_FAST := 1920.0 * 1080.0
+
+
+func _apply_render_scale() -> void:
+	var root := get_tree().root
+	var pixels := float(root.size.x) * float(root.size.y)
+	var cap := MAX_3D_PIXELS_HIGH if graphics_high else MAX_3D_PIXELS_FAST
+	var scale := clampf(sqrt(cap / maxf(pixels, 1.0)), 0.35, 1.0)
+	root.scaling_3d_scale = scale
+	# FSR 1 sharpens the scaled-up picture; the web's renderer only has bilinear.
+	var compat := RenderingServer.get_current_rendering_method() == "gl_compatibility"
+	root.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR if scale < 0.99 and not compat \
+		else Viewport.SCALING_3D_MODE_BILINEAR
+
+
 func _apply() -> void:
 	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Music"), linear_to_db(maxf(music_volume, 0.0001)))
 	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("SFX"), linear_to_db(maxf(sfx_volume, 0.0001)))
 	if DisplayServer.get_name() == "headless":
 		return
+	_apply_render_scale()
 	# "-- --windowed": never go fullscreen this run (tests, screenshots).
 	if "--windowed" in OS.get_cmdline_user_args():
 		return

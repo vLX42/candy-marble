@@ -90,6 +90,8 @@ static var test_start := Vector2i(-1, -1)
 ## Online race (set by Net when the server starts one): no rival, no pausing
 ## the world, the countdown waits for everyone, other players' marbles show up.
 static var net_race := false
+## Effects drawn once this run (see _warm_up).
+static var _warmed := false
 
 @export var first_level := 0
 ## Off for tests: stay on the level after reaching the goal.
@@ -336,6 +338,9 @@ func load_level(data: LevelBase) -> void:
 	_setup_ghost()
 	if net_race:
 		_net_setup()
+	if not _warmed:
+		# Next frame, once the camera is on the level.
+		get_tree().create_timer(0.1).timeout.connect(_warm_up)
 
 
 func _place(e: Dictionary) -> Node3D:
@@ -879,7 +884,7 @@ func _on_ball_landed(impact: float) -> void:
 
 
 ## Candy-dust puff where the marble lands.
-func dust(pos: Vector3, amount: float) -> void:
+func dust(pos: Vector3, amount: float) -> CPUParticles3D:
 	var p := CPUParticles3D.new()
 	var mesh := Palette.sphere(0.12)
 	var mat := StandardMaterial3D.new()
@@ -911,6 +916,7 @@ func dust(pos: Vector3, amount: float) -> void:
 	p.global_position = pos
 	p.emitting = true
 	p.finished.connect(p.queue_free)
+	return p
 
 
 func _on_goal() -> void:
@@ -1071,7 +1077,7 @@ func cheer(text: String, at: Vector3) -> void:
 	_popup(text, at, CandyText.PASTELS[2], 1.3)
 
 
-func _popup(text: String, at: Vector3, col: Color, size: float = 1.0) -> void:
+func _popup(text: String, at: Vector3, col: Color, size: float = 1.0) -> Label3D:
 	var l := Label3D.new()
 	l.text = text
 	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -1090,11 +1096,46 @@ func _popup(text: String, at: Vector3, col: Color, size: float = 1.0) -> void:
 	tw.chain().tween_callback(l.queue_free)
 	tw.tween_property(l, "modulate:a", 0.0, 0.9).set_delay(0.3)
 	tw.chain().tween_callback(l.queue_free)
+	return l
 
 
 # --- Juice ------------------------------------------------------------------
 
-func burst(pos: Vector3, colors: Array, amount: int, speed: float) -> void:
+## Each effect's shader is compiled the first time it's drawn, which froze the
+## game for ~70 ms on the first loop shout, landing puff, melt or sugar rush.
+## So draw them all once, too small to see, as the first level starts.
+func _warm_up() -> void:
+	if _warmed or DisplayServer.get_name() == "headless" or not camera or not world:
+		return
+	_warmed = true
+	var at := camera.global_position - camera.global_basis.z * 40.0
+	var parts: Array[CPUParticles3D] = [burst(at, [Palette.PINK], 4, 1.0), dust(at, 0.3)]
+	for extra in [Ball.make_trail(), Ball.make_bubbles(0.5)]:
+		world.add_child(extra)
+		extra.global_position = at
+		extra.one_shot = true
+		extra.emitting = true
+		parts.append(extra)
+	# Small enough not to see, big enough not to be culled.
+	for p in parts:
+		p.scale_amount_min = 0.03
+		p.scale_amount_max = 0.03
+	var goo := MeshInstance3D.new()
+	goo.mesh = Palette.sphere(0.5)
+	goo.material_override = Ball.goo_material()
+	world.add_child(goo)
+	goo.global_position = at
+	goo.scale = Vector3.ONE * 0.03
+	# Every letter of the shouts, so their glyphs are drawn into the font atlas too.
+	var l := _popup("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!-", at, CandyText.PASTELS[2], 1.3)
+	l.pixel_size = 0.00001
+	get_tree().create_timer(0.5).timeout.connect(func() -> void:
+		for n: Node in parts + [goo]:
+			if is_instance_valid(n):
+				n.queue_free())
+
+
+func burst(pos: Vector3, colors: Array, amount: int, speed: float) -> CPUParticles3D:
 	var p := CPUParticles3D.new()
 	var mesh := Palette.sphere(0.08)
 	var mat := StandardMaterial3D.new()
@@ -1127,6 +1168,7 @@ func burst(pos: Vector3, colors: Array, amount: int, speed: float) -> void:
 	p.global_position = pos
 	p.emitting = true
 	p.finished.connect(p.queue_free)
+	return p
 
 
 func show_message(text: String, duration: float = 0.0) -> void:

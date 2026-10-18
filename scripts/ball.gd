@@ -121,29 +121,7 @@ func _apply_rush() -> void:
 	push_force = _base.push_force * (1.7 if rush else 1.0)
 	air_control = 0.8 if rush else _base.air_control
 	if rush and _trail == null:
-		_trail = CPUParticles3D.new()
-		var m := Palette.sphere(0.12)
-		var mat := StandardMaterial3D.new()
-		mat.vertex_color_use_as_albedo = true
-		mat.emission_enabled = true
-		mat.emission_energy_multiplier = 0.6
-		m.material = mat
-		_trail.mesh = m
-		_trail.amount = 60
-		_trail.lifetime = 0.7
-		_trail.local_coords = false
-		_trail.direction = Vector3.UP
-		_trail.spread = 180.0
-		_trail.initial_velocity_min = 0.2
-		_trail.initial_velocity_max = 0.8
-		_trail.gravity = Vector3.ZERO
-		_trail.scale_amount_min = 0.5
-		_trail.scale_amount_max = 1.2
-		var g := Gradient.new()
-		g.interpolation_mode = Gradient.GRADIENT_INTERPOLATE_CONSTANT
-		g.offsets = PackedFloat32Array([0.0, 0.2, 0.4, 0.6, 0.8])
-		g.colors = PackedColorArray([Palette.PINK, Palette.LEMON, Palette.MINT, Palette.SKY, Palette.LILAC])
-		_trail.color_initial_ramp = g
+		_trail = Ball.make_trail()
 		add_child(_trail)
 		_glow = OmniLight3D.new()
 		_glow.light_color = Palette.PINK
@@ -329,6 +307,65 @@ func sink() -> void:
 		collision_mask = 0)
 
 
+## The rainbow sparkle trail behind a sugar-rushing marble.
+static func make_trail() -> CPUParticles3D:
+	var t := CPUParticles3D.new()
+	var m := Palette.sphere(0.12)
+	var mat := StandardMaterial3D.new()
+	mat.vertex_color_use_as_albedo = true
+	mat.emission_enabled = true
+	mat.emission_energy_multiplier = 0.6
+	m.material = mat
+	t.mesh = m
+	t.amount = 60
+	t.lifetime = 0.7
+	t.local_coords = false
+	t.direction = Vector3.UP
+	t.spread = 180.0
+	t.initial_velocity_min = 0.2
+	t.initial_velocity_max = 0.8
+	t.gravity = Vector3.ZERO
+	t.scale_amount_min = 0.5
+	t.scale_amount_max = 1.2
+	var g := Gradient.new()
+	g.interpolation_mode = Gradient.GRADIENT_INTERPOLATE_CONSTANT
+	g.offsets = PackedFloat32Array([0.0, 0.2, 0.4, 0.6, 0.8])
+	g.colors = PackedColorArray([Palette.PINK, Palette.LEMON, Palette.MINT, Palette.SKY, Palette.LILAC])
+	t.color_initial_ramp = g
+	return t
+
+
+## The see-through green goo a marble melts into (starts invisible, fades in).
+static func goo_material() -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color("#9BE35A", 0.0)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.emission_enabled = true
+	mat.emission = Color("#6FD13A")
+	mat.emission_energy_multiplier = 0.4
+	mat.roughness = 0.1
+	return mat
+
+
+## Sour bubbles rising off a melting marble.
+static func make_bubbles(r: float) -> CPUParticles3D:
+	var bubbles := CPUParticles3D.new()
+	bubbles.mesh = Palette.sphere(0.07)
+	var bm := StandardMaterial3D.new()
+	bm.albedo_color = Color("#B8F07A")
+	bubbles.mesh.material = bm
+	bubbles.amount = 24
+	bubbles.lifetime = 0.8
+	bubbles.direction = Vector3.UP
+	bubbles.spread = 25.0
+	bubbles.initial_velocity_min = 0.6
+	bubbles.initial_velocity_max = 1.6
+	bubbles.gravity = Vector3.ZERO
+	bubbles.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	bubbles.emission_sphere_radius = r
+	return bubbles
+
+
 ## Sour goo: the marble sinks into a bubbling green puddle, then comes back
 ## at the checkpoint like any other fall.
 func melt() -> void:
@@ -343,29 +380,10 @@ func melt() -> void:
 	var model: Node3D = $Model
 	var goo := MeshInstance3D.new()
 	goo.mesh = Palette.sphere(radius * 1.08)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color("#9BE35A", 0.0)
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.emission_enabled = true
-	mat.emission = Color("#6FD13A")
-	mat.emission_energy_multiplier = 0.4
-	mat.roughness = 0.1
+	var mat := Ball.goo_material()
 	goo.material_override = mat
 	add_child(goo)
-	var bubbles := CPUParticles3D.new()
-	bubbles.mesh = Palette.sphere(0.07)
-	var bm := StandardMaterial3D.new()
-	bm.albedo_color = Color("#B8F07A")
-	bubbles.mesh.material = bm
-	bubbles.amount = 24
-	bubbles.lifetime = 0.8
-	bubbles.direction = Vector3.UP
-	bubbles.spread = 25.0
-	bubbles.initial_velocity_min = 0.6
-	bubbles.initial_velocity_max = 1.6
-	bubbles.gravity = Vector3.ZERO
-	bubbles.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
-	bubbles.emission_sphere_radius = radius
+	var bubbles := Ball.make_bubbles(radius)
 	add_child(bubbles)
 	bubbles.emitting = true
 	var squash := Vector3(1.7, 0.1, 1.7)
