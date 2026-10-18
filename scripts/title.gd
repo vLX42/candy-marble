@@ -65,6 +65,7 @@ var _online_waiting: Label
 var _name_edit: LineEdit
 var _level_pick: OptionButton
 var _bot_pick: OptionButton
+var _rounds_pick: OptionButton
 var _host_row: HBoxContainer
 var _race_info: Label
 var _start_button: Button
@@ -536,11 +537,19 @@ func _build_online(root: Control) -> void:
 	_host_row = HBoxContainer.new()
 	_host_row.add_theme_constant_override("separation", 12)
 	_online_lobby.add_child(_host_row)
+	_rounds_pick = OptionButton.new()
+	for n: int in Net.ROUND_CHOICES:
+		_rounds_pick.add_item("1 race" if n == 1 else "%d races" % n, n)
+	_rounds_pick.custom_minimum_size = Vector2(130, 0)
+	_rounds_pick.item_selected.connect(func(_i: int) -> void: _send_settings())
+	_host_row.add_child(_rounds_pick)
 	_level_pick = OptionButton.new()
+	# Item ids are the level index + 1; 0 is random levels (-1 in Net).
+	_level_pick.add_item("Random levels", 0)
 	for i in MainGame.LEVELS.size():
 		var lvl: LevelBase = MainGame.LEVELS[i].new()
-		_level_pick.add_item("%d  %s" % [i + 1, lvl.title], i)
-	_level_pick.custom_minimum_size = Vector2(320, 0)
+		_level_pick.add_item("%d  %s" % [i + 1, lvl.title], i + 1)
+	_level_pick.custom_minimum_size = Vector2(300, 0)
 	_level_pick.item_selected.connect(func(_i: int) -> void: _send_settings())
 	_host_row.add_child(_level_pick)
 	_bot_pick = OptionButton.new()
@@ -596,7 +605,7 @@ func _leave_online() -> void:
 
 
 func _send_settings() -> void:
-	Net.set_settings(_level_pick.get_selected_id(), _bot_pick.get_selected_id())
+	Net.set_settings(_level_pick.get_selected_id() - 1, _bot_pick.get_selected_id(), _rounds_pick.get_selected_id())
 
 
 func _refresh_online() -> void:
@@ -641,14 +650,20 @@ func _refresh_online() -> void:
 		row.add_child(who)
 		_online_players.add_child(row)
 	var host := Net.is_host()
-	var lvl_title: String = MainGame.LEVELS[clampi(Net.level, 0, MainGame.LEVELS.size() - 1)].new().title
-	_race_info.text = "Next race: level %d  %s,  %s" % [Net.level + 1, lvl_title,
-		"no bots" if Net.bots == 0 else ("1 bot" if Net.bots == 1 else "%d bots" % Net.bots)]
+	var bot_text := "no bots" if Net.bots == 0 else ("1 bot" if Net.bots == 1 else "%d bots" % Net.bots)
+	var races := "1 race" if Net.rounds == 1 else "%d races" % Net.rounds
+	if Net.level < 0:
+		_race_info.text = "Next: %s on random levels,  %s" % [races, bot_text]
+	else:
+		var lvl_title: String = MainGame.LEVELS[clampi(Net.level, 0, MainGame.LEVELS.size() - 1)].new().title
+		_race_info.text = "Next: %s, %s level %d  %s,  %s" % [races, "starting on" if Net.rounds > 1 else "on",
+			Net.level + 1, lvl_title, bot_text]
 	_host_row.visible = host
 	_start_button.visible = host
 	_ready_button.visible = not host
 	if host:
-		_level_pick.select(Net.level)
+		_level_pick.select(_level_pick.get_item_index(Net.level + 1))
+		_rounds_pick.select(maxi(_rounds_pick.get_item_index(Net.rounds), 0))
 		var room := Net.max_bots()
 		if _bot_pick.item_count != room + 1:
 			_bot_pick.clear()
@@ -659,7 +674,8 @@ func _refresh_online() -> void:
 	_ready_button.text = "Not ready" if me.get("ready", false) else "I'm ready"
 	_start_button.disabled = Net.phase != "lobby" or not Net.all_ready()
 	if Net.phase != "lobby":
-		_online_waiting.text = "A race is on. You're in the next one."
+		_online_waiting.text = "Race %d of %d is on. You're in the next one." % [Net.round_no + 1, Net.rounds] \
+			if Net.rounds > 1 else "A race is on. You're in the next one."
 	elif host and not not_ready.is_empty():
 		_online_waiting.text = "Waiting for %s to be ready." % ", ".join(not_ready)
 	elif host and ids.size() == 1:

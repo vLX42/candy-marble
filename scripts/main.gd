@@ -50,6 +50,9 @@ const SCENES := {
 ## Sugar Rush: pinball hits fill the meter; full = a few seconds of rush.
 const RUSH_HITS := 6.0
 const RUSH_TIME := 7.0
+## Floating candy effects (see candy()).
+const STICKY_TIME := 5.0
+const DIZZY_TIME := 6.0
 ## Medal thresholds as multiples of the level's par time.
 const MEDALS := [[1.0, "GOLD"], [1.3, "SILVER"], [1.7, "BRONZE"]]
 
@@ -92,6 +95,8 @@ static var test_start := Vector2i(-1, -1)
 static var net_race := false
 ## Effects drawn once this run (see _warm_up).
 static var _warmed := false
+## Tests set this so the candy luck is the same every run (-1 = random).
+static var candy_seed := -1
 
 @export var first_level := 0
 ## Off for tests: stay on the level after reaching the goal.
@@ -150,6 +155,9 @@ var falls := 0
 var level_falls := 0
 var rush_meter := 0.0
 var rush_left := 0.0
+var sticky_left := 0.0
+var dizzy_left := 0.0
+var _candy_rng := RandomNumberGenerator.new()
 var finished := false
 var game_complete := false
 
@@ -253,6 +261,12 @@ func load_level(data: LevelBase) -> void:
 	level_falls = 0
 	rush_meter = 0.0
 	rush_left = 0.0
+	sticky_left = 0.0
+	dizzy_left = 0.0
+	if candy_seed >= 0:
+		_candy_rng.seed = hash(candy_seed * 7919 + level_index)
+	else:
+		_candy_rng.randomize()
 
 	world = Node3D.new()
 	world.name = "World"
@@ -318,7 +332,8 @@ func load_level(data: LevelBase) -> void:
 		var d := level.description.replace("\n", " ")
 		intro = "%s\n%s" % [level.title, d if d.length() <= 90 else d.substr(0, 87) + "..."]
 	if net_race:
-		intro = "%s\nOnline race. Waiting for everyone..." % level.title
+		var series := "Race %d of %d.  " % [Net.round_no + 1, Net.rounds] if Net.rounds > 1 else ""
+		intro = "%s\n%sOnline race. Waiting for everyone..." % [level.title, series]
 	show_message(intro, 3.0)
 	_count_left = COUNT_TIME if countdown else 0.0
 	_count_shown = ""
@@ -458,6 +473,9 @@ func _process(delta: float) -> void:
 	_cam_yaw_vel += (CAMERA_TURN * CAMERA_TURN * angle_difference(_cam_yaw, target_yaw) - 2.0 * CAMERA_TURN * _cam_yaw_vel) * dt
 	_cam_yaw = wrapf(_cam_yaw + _cam_yaw_vel * dt, -PI, PI)
 	camera.rotation = Vector3(deg_to_rad(CAMERA_ROTATION.x), _cam_yaw, 0.0)
+	if dizzy_left > 0.0:
+		# Tipsy view: a slow sway that fades out in the last second.
+		camera.rotation.z = sin(level_time * 1.7) * deg_to_rad(5.0) * minf(dizzy_left, 1.0)
 	# Upright phones: keep the track's width in view and show more road ahead.
 	camera.keep_aspect = Camera3D.KEEP_WIDTH if Tilt.is_portrait() else Camera3D.KEEP_HEIGHT
 	var want_size := Settings.camera_size() * (1.35 if _fly_left > 0.0 else 1.0)
@@ -717,12 +735,49 @@ func charge(amount: float, at: Vector3) -> void:
 	rush_meter = minf(1.0, rush_meter + amount / RUSH_HITS)
 	if rush_meter >= 0.999:
 		rush_meter = 0.0
-		rush_left = RUSH_TIME
-		ball.rush = true
-		sfx.play("rush" if sfx.has("rush") else "boost")
-		cheer("SUGAR RUSH!", ball.global_position + Vector3.UP * 2.2)
-		if _music:
-			_music.pitch_scale = 1.08
+		_start_rush()
+
+
+func _start_rush() -> void:
+	_end_sticky()
+	rush_left = RUSH_TIME
+	ball.rush = true
+	sfx.play("rush" if sfx.has("rush") else "boost")
+	cheer("SUGAR RUSH!", ball.global_position + Vector3.UP * 2.2)
+	if _music:
+		_music.pitch_scale = 1.08
+
+
+## Floating candy (decor.gd) the player rolled through. Every one is a
+## gamble: a Sugar Rush, sticky toffee (slow for a while) or dizzy (wobbly
+## steering and a swaying view).
+func candy(_kind: String, at: Vector3, who: Node) -> void:
+	if who != ball or finished:
+		return
+	sfx.play("coin", -6.0)
+	burst(at, [Palette.PINK, Palette.LEMON, Palette.MINT, Palette.SKY], 18, 3.0)
+	var roll := _candy_rng.randf()
+	if roll < 0.4:
+		rush_meter = 0.0
+		_start_rush()
+	elif roll < 0.7:
+		rush_left = 0.0
+		ball.rush = false
+		sticky_left = STICKY_TIME
+		ball.sticky = true
+		cheer("STICKY!", ball.global_position + Vector3.UP * 2.2)
+		show_message("Sticky toffee! Slow for %d s" % STICKY_TIME, 1.8)
+	else:
+		dizzy_left = DIZZY_TIME
+		ball.dizzy = true
+		cheer("DIZZY!", ball.global_position + Vector3.UP * 2.2)
+		show_message("Dizzy! The steering wobbles for %d s" % DIZZY_TIME, 1.8)
+
+
+func _end_sticky() -> void:
+	sticky_left = 0.0
+	if ball:
+		ball.sticky = false
 
 
 func _update_rush(delta: float) -> void:
@@ -736,6 +791,15 @@ func _update_rush(delta: float) -> void:
 				_music.pitch_scale = 1.0
 	else:
 		hud.set_rush(rush_meter, false, 0.0)
+	if sticky_left > 0.0:
+		sticky_left -= delta
+		if sticky_left <= 0.0 or finished:
+			_end_sticky()
+	if dizzy_left > 0.0:
+		dizzy_left -= delta
+		if dizzy_left <= 0.0 or finished:
+			dizzy_left = 0.0
+			ball.dizzy = false
 
 
 ## 1 if the player is ahead of the rival along the route, else 2.
@@ -863,6 +927,9 @@ func _camera_focus() -> Vector3:
 
 func _on_ball_died() -> void:
 	falls += 1
+	_end_sticky()
+	dizzy_left = 0.0
+	ball.dizzy = false
 	level_falls += 1
 	if ball.death_cause == "melt":
 		# Melted in sour goo: a green splash instead of the candy pop.
@@ -1387,19 +1454,33 @@ func _net_finish_update(id: int, _time: float) -> void:
 
 
 func _net_results(rows: Array) -> void:
+	var series := Net.rounds > 1
+	var final := series and Net.last_round()
 	var board := []
 	var me := -1
 	for k in rows.size():
 		var r: Dictionary = rows[k]
-		board.append([r.name + (" (bot)" if r.get("bot", false) else ""), r.time])
+		var who: String = r.name + (" (bot)" if r.get("bot", false) else "")
+		var pts := int(r.get("points", 0))
+		if final:
+			board.append([who, "%d pts" % int(r.get("total", 0)), "+%d" % pts if pts > 0 else ""])
+		elif series:
+			board.append([who, r.time, "+%d  (%d pts)" % [pts, int(r.get("total", 0))]])
+		else:
+			board.append([who, r.time])
 		if int(r.id) == Net.my_id():
 			me = k
 	var winner: Dictionary = rows[0] if not rows.is_empty() else {}
 	var title := "Race over"
-	if not winner.is_empty() and float(winner.time) >= 0.0:
+	if final and not winner.is_empty():
+		title = "You win the series!" if int(winner.id) == Net.my_id() else "%s wins the series!" % winner.name
+	elif not winner.is_empty() and float(winner.time) >= 0.0:
 		title = "You win!" if int(winner.id) == Net.my_id() else "%s wins!" % winner.name
-	hud.show_results({title = title, board_title = "RESULTS", board = board, highlight = me,
-		info = "Back to the lobby in a few seconds", buttons = [["Leave", "quit"]], confetti = me == 0})
+	if series and not final:
+		title = "Race %d of %d:  %s" % [Net.round_no + 1, Net.rounds, title]
+	hud.show_results({title = title, board_title = "STANDINGS" if final else "RESULTS", board = board,
+		highlight = me, buttons = [["Leave", "quit"]], confetti = me == 0,
+		info = "Next race in a few seconds" if series and not final else "Back to the lobby in a few seconds"})
 
 
 func _net_status() -> void:

@@ -27,6 +27,13 @@ var alive := true
 ## Seconds left where input is ignored (while being shot through a loop).
 var input_lock := 0.0
 ## Sugar Rush: faster, grippier, and sweepers can't pop you. Set by main.
+## Candy effects (main.gd): sticky toffee slows you, dizzy wobbles the steering.
+var sticky := false:
+	set(v):
+		sticky = v
+		_apply_rush()
+var dizzy := false
+var _dizzy_t := 0.0
 var rush := false:
 	set(v):
 		rush = v
@@ -117,8 +124,8 @@ func _physics_process(_delta: float) -> void:
 func _apply_rush() -> void:
 	if _base.is_empty():
 		_base = {max_speed = max_speed, push_force = push_force, air_control = air_control}
-	max_speed = _base.max_speed * (1.45 if rush else 1.0)
-	push_force = _base.push_force * (1.7 if rush else 1.0)
+	max_speed = _base.max_speed * (1.45 if rush else 1.0) * (0.55 if sticky else 1.0)
+	push_force = _base.push_force * (1.7 if rush else 1.0) * (0.6 if sticky else 1.0)
 	air_control = 0.8 if rush else _base.air_control
 	if rush and _trail == null:
 		_trail = Ball.make_trail()
@@ -145,6 +152,10 @@ func _steer_dir() -> Vector3:
 	var input := Input.get_vector("left", "right", "up", "down")
 	if input == Vector2.ZERO:
 		return Vector3.ZERO
+	if dizzy:
+		# Tipsy: the stick swings slowly left and right of where you push.
+		_dizzy_t += get_physics_process_delta_time()
+		input = input.rotated(sin(_dizzy_t * 2.1) * 0.9 + sin(_dizzy_t * 5.3) * 0.3)
 	return _screen_to_world(input)
 
 

@@ -194,7 +194,7 @@ func show_results(r: Dictionary) -> void:
 	_res_board_box.visible = not times.is_empty()
 	_res_board_title.text = r.get("board_title", "BEST TIMES")
 	var hl: int = r.get("highlight", -1)
-	# Rows are times, or [name, time] for an online race (time < 0: didn't finish).
+	# Rows are times, or [name, time, extra] for an online race (time < 0: didn't finish).
 	var rest_shown := false
 	for k in times.size():
 		var col := Palette.CORAL if k == hl else INK
@@ -207,9 +207,13 @@ func show_results(r: Dictionary) -> void:
 			# three, then everyone else smaller underneath.
 			_res_board.remove_child(rank)
 			rank.queue_free()
-			var tm: float = row[1]
-			var line := "%s   %s" % [row[0], "%.2f s" % tm if tm >= 0.0 else "DNF"]
-			if k < 3 and tm >= 0.0:
+			# [name, time (< 0: did not finish) or a text like "24 pts", extra text]
+			var v: Variant = row[1]
+			var placed: bool = v is String or float(v) >= 0.0
+			var line := "%s   %s" % [row[0], v if v is String else ("%.2f s" % v if placed else "DNF")]
+			if row.size() > 2 and str(row[2]) != "":
+				line += "   " + str(row[2])
+			if k < 3 and placed:
 				_res_board.add_child(_chip(_ordinal(k + 1), MEDAL_COLORS[["GOLD", "SILVER", "BRONZE"][k]], 22)[0])
 				_res_board.add_child(_plain(line, 28 - 2 * k, col))
 			else:

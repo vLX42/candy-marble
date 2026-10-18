@@ -44,8 +44,12 @@ somewhere else: `?server=ws://localhost:9080` on the web page, or
 
 - Players join and wait in the lobby. Everyone but the host presses
   **I'm ready**. The host (the first one in; if they leave, the next seat
-  takes over) picks the level and how many **bots** fill the empty seats, and
-  presses Start race once everyone is ready. Alone with bots works too.
+  takes over) picks how many races (1, 3 or 5), random levels or the first
+  level, and how many **bots** fill the empty seats, and presses Start race
+  once everyone is ready. Alone with bots works too.
+- A series: the levels are drawn at random without repeats (the picked level
+  goes first). Each race gives points by place (10, 8, 6, 5, 4, 3; did not
+  finish: 0). After the last race the results are the standings by points.
 - Bots are the licorice AI. They run in the host's game, which sends their
   positions and finish times like a player's. They can't press switches, so on
   puzzle levels they get through the gates the host opens. If the host leaves,
@@ -55,8 +59,9 @@ somewhere else: `?server=ws://localhost:9080` on the web page, or
 - Each player solves their own switches and gates and has their own
   monsters. The other marbles are solid: you can bump them, they push you.
 - When the first marble finishes, the others get 30 seconds (`--grace=`),
-  then the results (a podium: gold, silver, bronze, and the rest), and 10
-  seconds later everyone is back in the lobby.
+  then the results (a podium: gold, silver, bronze, and the rest). 10 seconds
+  later the next race loads, or after the last one everyone is back in the
+  lobby. Whoever leaves during a series sits out the rest of it.
 - Players who join mid-race wait in the lobby for the next one.
 
 ## Run it anywhere else
@@ -67,6 +72,6 @@ Any machine with the game or the Godot editor:
 godot --headless -- --server --port=9080
 ```
 
-Test it with two bot clients and two AI bots: `bash tests/net_test.sh` (starts
-its own server), or `URL=wss://candy.vlx.dk bash tests/net_test.sh` against
+Test it with two bot clients and two AI bots racing a 2-race series:
+`bash tests/net_test.sh` (starts its own server), or `URL=wss://candy.vlx.dk bash tests/net_test.sh` against
 the live one.

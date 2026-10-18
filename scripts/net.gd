@@ -22,15 +22,18 @@ signal status_changed                # offline / connecting / online / failed / 
 signal go                            # everyone has loaded: start the countdown
 signal remote_state(id: int, pos: Vector3, vel: Vector3, alive: bool, progress: float)
 signal finish_update(id: int, time: float)
-signal results(rows: Array)          # [{name, time (-1 = did not finish), slot, id, bot}, ...]
+signal results(rows: Array)          # [{name, time (-1 = did not finish), slot, id, bot, points, total}, ...]
 
 const SERVER_URL := "wss://candy.vlx.dk"
-const PROTOCOL := 2
+const PROTOCOL := 3
 const DEFAULT_PORT := 9080
 const MAX_PLAYERS := 6
 const LOAD_TIMEOUT := 15.0
 const RESULTS_TIME := 10.0
 const STATE_RATE := 20.0
+## Points per place in a race of a series (did not finish: 0).
+const POINTS := [10, 8, 6, 5, 4, 3]
+const ROUND_CHOICES := [1, 3, 5]
 ## One colour per seat in the lobby (the marble others see you as).
 const COLORS := ["#F6845E", "#6FB8F0", "#8FD35A", "#B39BEA", "#F2D35C", "#F58FB8"]
 const BOT_NAMES := ["Licorice", "Gumdrop", "Toffee", "Jellybean", "Taffy"]
@@ -47,8 +50,11 @@ var finish_grace := 30.0             # server: seconds the others get after the 
 var players := {}
 var host_id := 0
 var phase := "lobby"                 # lobby, loading, racing, results
-var level := 0
+var level := -1                      # -1: random levels
 var bots := 0                        # bots the host wants in the next race
+var rounds := 3                      # races in a series
+var round_no := 0                    # the race being run (0 based)
+var playlist: Array = []             # the series' levels
 var status := "offline"
 var status_text := ""
 var finish_order: Array[int] = []
@@ -194,9 +200,15 @@ func set_ready(on: bool) -> void:
 		_set_ready.rpc_id(1, on)
 
 
-func set_settings(level_index: int, bot_count: int) -> void:
+## level_index -1 = random levels.
+func set_settings(level_index: int, bot_count: int, round_count: int) -> void:
 	if is_host():
-		_set_settings.rpc_id(1, level_index, bot_count)
+		_set_settings.rpc_id(1, level_index, bot_count, round_count)
+
+
+## True on the last race of a series (and for a single race).
+func last_round() -> bool:
+	return round_no >= rounds - 1
 
 
 func request_start() -> void:
@@ -263,12 +275,15 @@ func _set_status(s: String, text: String) -> void:
 # --- messages: server to clients ----------------------------------------------------
 
 @rpc("authority", "call_remote", "reliable")
-func _lobby(list: Dictionary, host: int, current_phase: String, current_level: int, bot_count: int) -> void:
+func _lobby(list: Dictionary, host: int, current_phase: String, info: Dictionary) -> void:
 	players = list
 	host_id = host
 	phase = current_phase
-	level = current_level
-	bots = bot_count
+	level = info.level
+	bots = info.bots
+	rounds = info.rounds
+	round_no = info.round
+	playlist = info.playlist
 	changed.emit()
 
 
@@ -355,11 +370,12 @@ func _set_ready(on: bool) -> void:
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func _set_settings(level_index: int, bot_count: int) -> void:
+func _set_settings(level_index: int, bot_count: int, round_count: int) -> void:
 	if not server_mode or multiplayer.get_remote_sender_id() != host_id or phase != "lobby":
 		return
-	level = clampi(level_index, 0, _level_count() - 1)
+	level = clampi(level_index, -1, _level_count() - 1)
 	bots = clampi(bot_count, 0, max_bots())
+	rounds = clampi(round_count, 1, 9)
 	_broadcast_lobby()
 
 
@@ -370,21 +386,57 @@ func _request_start() -> void:
 	var id := multiplayer.get_remote_sender_id()
 	if id != host_id or phase != "lobby" or not all_ready():
 		return
-	phase = "loading"
-	_timer = 0.0
-	_first_finish = -1.0
-	finish_order.clear()
+	playlist = _make_playlist()
+	round_no = 0
 	for pid in humans():
-		_reset_racer(players[pid])
+		players[pid].in_race = true
+		players[pid].points = 0
 	# Bots take the free seats; the host's game runs them.
 	for k in mini(bots, max_bots()):
 		var bid := -(k + 1)
 		players[bid] = {name = BOT_NAMES[k % BOT_NAMES.size()], slot = _free_slot(), ready = true,
 			in_race = true, loaded = true, finished = false, time = -1.0, falls = 0, left = false,
-			bot = true, owner = host_id}
-	_log("%s started level %d: %d players, %d bots" % [name_of(id), level + 1, humans().size(), bots])
+			bot = true, owner = host_id, points = 0}
+	_log("%s started %d race(s) %s: %d players, %d bots" % [name_of(id), rounds,
+		str(playlist.map(func(l: int) -> int: return l + 1)), humans().size(), bots])
+	_begin_round()
+
+
+## The series: the picked level first (or a random one), then random others,
+## no repeats while there are levels left.
+func _make_playlist() -> Array:
+	var pool := range(_level_count())
+	pool.shuffle()
+	if level >= 0:
+		pool.erase(level)
+		pool.push_front(level)
+	var list := []
+	for k in rounds:
+		list.append(pool[k % pool.size()])
+	return list
+
+
+func _begin_round() -> void:
+	phase = "loading"
+	_timer = 0.0
+	_first_finish = -1.0
+	finish_order.clear()
+	for id in race_ids():
+		var p: Dictionary = players[id]
+		if p.left:
+			# Left during the series: stays in the lobby for the rest of it.
+			p.in_race = false
+			continue
+		_reset_racer(p)
+		if p.get("bot", false):
+			p.loaded = true
+	if not race_ids().any(func(id: int) -> bool: return not is_bot(id)):
+		_log("everyone left the series")
+		_back_to_lobby()
+		return
+	_log("race %d of %d: level %d" % [round_no + 1, rounds, playlist[round_no] + 1])
 	_broadcast_lobby()
-	_start.rpc(level, race_ids())
+	_start.rpc(playlist[round_no], race_ids())
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -472,16 +524,23 @@ func _server_tick(delta: float) -> void:
 				_end_race()
 		"results":
 			_timer += delta
-			if _timer > RESULTS_TIME:
-				phase = "lobby"
-				for id: int in players.keys():
-					if players[id].get("bot", false):
-						players.erase(id)
-					else:
-						players[id].in_race = false
-						players[id].ready = false
-				_broadcast_lobby()
-				_to_lobby.rpc()
+			if _timer > RESULTS_TIME and not last_round():
+				round_no += 1
+				_begin_round()
+			elif _timer > RESULTS_TIME + (4.0 if rounds > 1 else 0.0):
+				_back_to_lobby()
+
+
+func _back_to_lobby() -> void:
+	phase = "lobby"
+	for id: int in players.keys():
+		if players[id].get("bot", false):
+			players.erase(id)
+		else:
+			players[id].in_race = false
+			players[id].ready = false
+	_broadcast_lobby()
+	_to_lobby.rpc()
 
 
 func _record_finish(id: int, time: float, falls: int) -> void:
@@ -523,17 +582,30 @@ func _end_race() -> void:
 	for id in race_ids():
 		var p: Dictionary = players[id]
 		rows.append({name = p.name, time = p.time if p.finished else -1.0, slot = p.slot, id = id,
-			bot = p.get("bot", false)})
+			bot = p.get("bot", false), points = 0, total = 0})
 	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		if (a.time < 0.0) != (b.time < 0.0):
 			return a.time >= 0.0
 		return a.time < b.time if a.time >= 0.0 else a.slot < b.slot)
+	for k in rows.size():
+		var r: Dictionary = rows[k]
+		if r.time >= 0.0:
+			r.points = POINTS[mini(k, POINTS.size() - 1)]
+		players[r.id].points = players[r.id].get("points", 0) + r.points
+		r.total = players[r.id].points
+	if last_round() and rounds > 1:
+		# The final standings: most points first (ties: this race's order).
+		var order := {}
+		for k in rows.size():
+			order[rows[k].id] = k
+		rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			return a.total > b.total if a.total != b.total else order[a.id] < order[b.id])
 	phase = "results"
 	_timer = 0.0
 	var line := []
 	for r: Dictionary in rows:
-		line.append("%s %s" % [r.name, "%.2f s" % r.time if r.time >= 0.0 else "DNF"])
-	_log("results: " + ", ".join(line))
+		line.append("%s %s (%d pts)" % [r.name, "%.2f s" % r.time if r.time >= 0.0 else "DNF", r.total])
+	_log("race %d of %d results: %s" % [round_no + 1, rounds, ", ".join(line)])
 	_broadcast_lobby()
 	_results.rpc(rows)
 
@@ -568,7 +640,8 @@ func _level_count() -> int:
 
 
 func _broadcast_lobby() -> void:
-	_lobby.rpc(players, host_id, phase, level, bots)
+	_lobby.rpc(players, host_id, phase, {level = level, bots = bots, rounds = rounds, round = round_no,
+		playlist = playlist})
 
 
 func _on_peer_connected(id: int) -> void:

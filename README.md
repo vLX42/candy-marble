@@ -21,16 +21,22 @@ par. Best level times and best full runs are saved locally.
 - **Arcade timer** (off by default): like the 1984 cabinet, every level adds
   time to one clock and leftover seconds carry over. Run out and it's
   "Time's up!", R starts over from level 1.
+- **Candy pickups**: the floating candies (gumdrops, hearts, wrapped
+  candies, golden cupcakes, gems) are a gamble. Roll through one and you get a
+  Sugar Rush (faster), sticky toffee (slow for 5 s) or dizzy (the steering
+  wobbles and the view sways for 6 s). They come back after 15 s.
 - **Races**: on some levels the evil licorice ball races you to the hole. It
   uses boosters, loops and cannons too, and you can bump each other around.
   Win the race to clear the level.
 - **Online races**: up to six racers on the same level, desktop and the web
   version together, on the race server at candy.vlx.dk. Title screen > Online
   race, type your name, Join. Everyone says Ready; the host (first one in)
-  picks the level and how many AI bots fill the empty seats, then starts. The
-  others are solid marbles in their seat colour with their name on top; each
-  player solves their own switches. Results come as a podium: gold, silver,
-  bronze, and the rest. The server runs in Docker on the NAS, see
+  picks 1, 3 or 5 races, random levels or a starting level, and how many AI
+  bots fill the empty seats, then starts. The others are solid marbles in
+  their seat colour with their name on top; each player solves their own
+  switches. Every race ends with a podium (gold, silver, bronze, and the rest)
+  and points (10, 8, 6, 5, 4, 3); after the last one, the standings crown the
+  series winner. The server runs in Docker on the NAS, see
   [server/README.md](server/README.md).
 - **Sugar Rush**: pinball hits (bumpers, slingshots, spinners, rollovers,
   hoops, targets, loops, cannons) fill the sugar meter. Full meter = 7 seconds
@@ -258,7 +264,8 @@ godot --headless --fixed-fps 120 -s tests/madness_test.gd  # hard landings, goo,
 godot --headless --fixed-fps 120 -s tests/flow_test.gd     # countdown, pause, ghost replay, test from here
 godot --headless --fixed-fps 120 -s tests/diagonal_test.gd # diagonal ramp tiles
 godot --headless --fixed-fps 120 -s tests/puzzle_test.gd   # switch sets, order, timed combos, levers, the steelie's brain
-bash tests/net_test.sh                                     # online race: a server and two bots race level 12 (real time, ~1 min)
+godot --headless --fixed-fps 120 -s tests/candy_test.gd    # candy pickups: random effect, respawn, sticky, dizzy
+bash tests/net_test.sh                                     # online series: a server, two players and two AI bots race 2 levels (real time, ~4 min)
 godot -s tests/shots.gd -- --windowed --puzzles           # screenshots at every switch in the campaign
 godot --headless -s tools/check_seams.gd -- --level=1          # ramp tiles that don't meet their neighbours
 godot --headless --fixed-fps 120 -s tests/original_test.gd # pipe, ice, slime, steelie, GOAL pad, silly, arcade clock
