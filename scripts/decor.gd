@@ -1,8 +1,8 @@
 class_name Decor
 extends StaticBody3D
-## Decoration (Blender models). Lollipops, trees and bears are solid; the
-## floating candies are pickups with a random effect (main.gd candy()) that
-## come back after a while.
+## Decoration (Blender models) with a thin collider so the ball bumps it.
+## The floating candies are also pickups with a random effect (main.gd
+## candy()) that come back after a while.
 
 const RESPAWN := 15.0
 
@@ -16,8 +16,16 @@ var _t := 0.0
 
 
 func _ready() -> void:
+	var shape := CylinderShape3D.new()
+	shape.radius = 0.12 if kind == "lollipop" else 0.45
+	shape.height = 1.4
+	var cs := CollisionShape3D.new()
+	cs.shape = shape
+	cs.position.y = 0.7
+	add_child(cs)
 	if kind not in ["lollipop", "tree", "bear"]:
-		# Floating candy: no wall, a pickup (see main.gd candy()).
+		# Floating candy: still a little post to bump into (levels use them on
+		# corners), and a pickup on touch (see main.gd candy()).
 		var m := Palette.load_model(self, kind)
 		if m:
 			m.scale = Vector3.ONE * 1.6
@@ -34,13 +42,6 @@ func _ready() -> void:
 		add_child(area)
 		area.body_entered.connect(_on_touched)
 		return
-	var shape := CylinderShape3D.new()
-	shape.radius = 0.12 if kind == "lollipop" else 0.45
-	shape.height = 1.4
-	var cs := CollisionShape3D.new()
-	cs.shape = shape
-	cs.position.y = 0.7
-	add_child(cs)
 	if has_node("Model") or Palette.load_model(self, kind) != null:
 		return
 	# Fallback placeholders.

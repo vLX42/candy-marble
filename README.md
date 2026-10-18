@@ -22,7 +22,7 @@ par. Best level times and best full runs are saved locally.
   time to one clock and leftover seconds carry over. Run out and it's
   "Time's up!", R starts over from level 1.
 - **Candy pickups**: the floating candies (gumdrops, hearts, wrapped
-  candies, golden cupcakes, gems) are a gamble. Roll through one and you get a
+  candies, golden cupcakes, gems) are a gamble. Bump into one and you get a
   Sugar Rush (faster), sticky toffee (slow for 5 s) or dizzy (the steering
   wobbles and the view sways for 6 s). They come back after 15 s.
 - **Races**: on some levels the evil licorice ball races you to the hole. It

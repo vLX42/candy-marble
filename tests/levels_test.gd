@@ -32,8 +32,8 @@ var cam_prev := Vector3.ZERO
 
 func _initialize() -> void:
 	main = load("res://scenes/main.tscn").instantiate()
-	# The same candy luck every run, so a run is repeatable.
-	main.get_script().set("candy_seed", 1)
+	# The bot checks the route; candy effects are random luck (candy_test).
+	main.get_script().set("candy_effects", false)
 	main.auto_advance = false
 
 	main.save_scores = false

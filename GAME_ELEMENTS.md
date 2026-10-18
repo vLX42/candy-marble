@@ -63,7 +63,7 @@ no rails: open edges everywhere except where a turn follows a fast descent.
 | `M` | Humps | A strip of M tiles makes big smooth humps along its long side (Marble Madness bridges) |
 | `I` | Ice | Friction 0.04, hardly any grip or steering |
 | `l` `t` `b` | Decor | Lollipop, candy tree, gummy bear. Solid, the marble bumps them |
-| `g` `%` `h` `r` `$` | Candy pickup | Gumdrop, golden cupcake, heart, wrapped candy, gem. Floating; rolling through one gives a random effect: Sugar Rush (40%), sticky toffee, slow for 5 s (30%), or dizzy, wobbly steering and a swaying view for 6 s (30%). Back after 15 s. The rival can't eat them |
+| `g` `%` `h` `r` `$` | Candy pickup | Gumdrop, golden cupcake, heart, wrapped candy, gem. Floating over a thin post; bumping into one gives a random effect: Sugar Rush (40%), sticky toffee, slow for 5 s (30%), or dizzy, wobbly steering and a swaying view for 6 s (30%). Back after 15 s. The rival can't eat them |
 
 ## 4. Extras (things with parameters)
 

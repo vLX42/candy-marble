@@ -97,6 +97,9 @@ static var net_race := false
 static var _warmed := false
 ## Tests set this so the candy luck is the same every run (-1 = random).
 static var candy_seed := -1
+## The level bots switch candy effects off: they check a level can be
+## finished, and a dizzy bot near a drop proves nothing (candy_test does them).
+static var candy_effects := true
 
 @export var first_level := 0
 ## Off for tests: stay on the level after reaching the goal.
@@ -752,7 +755,7 @@ func _start_rush() -> void:
 ## gamble: a Sugar Rush, sticky toffee (slow for a while) or dizzy (wobbly
 ## steering and a swaying view).
 func candy(_kind: String, at: Vector3, who: Node) -> void:
-	if who != ball or finished:
+	if who != ball or finished or not candy_effects:
 		return
 	sfx.play("coin", -6.0)
 	burst(at, [Palette.PINK, Palette.LEMON, Palette.MINT, Palette.SKY], 18, 3.0)
